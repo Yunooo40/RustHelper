@@ -4,6 +4,7 @@ import 'dotenv/config';
 import path from 'node:path';
 
 const env = process.env;
+const rawDbPath = env.DATABASE_PATH ?? './data/rustlink.sqlite';
 
 export const config = {
   env: env.NODE_ENV ?? 'development',
@@ -22,7 +23,8 @@ export const config = {
   },
 
   db: {
-    path: path.resolve(env.DATABASE_PATH ?? './data/rustlink.sqlite'),
+    // ":memory:" et "" sont des modes SQLite spéciaux : ne pas les résoudre en chemin.
+    path: rawDbPath === ':memory:' || rawDbPath === '' ? ':memory:' : path.resolve(rawDbPath),
   },
 };
 
