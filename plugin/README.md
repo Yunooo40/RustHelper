@@ -9,9 +9,12 @@ to Discord.
 | Event | When it fires | `status` | Discord countdown? |
 |---|---|---|---|
 | `helicopter` | Patrol Helicopter spawns / is destroyed | `spawned` / `destroyed` | on destroy, if estimate set |
-| `chinook` | CH47 spawns / flies away | `spawned` / `left` | — |
+| `chinook` | CH47 spawns / flies away **or is shot down** | `spawned` / `left` | — |
 | `cargo` | Cargo Ship spawns / leaves | `spawned` / `left` | on leave, if estimate set |
 | `bradley` | Bradley APC spawns / is destroyed | `spawned` / `destroyed` | on destroy (default 60 min) |
+
+> **Note:** the Discord countdown fires at the **end** of an event (destroy / leave),
+> not on spawn. A CH47 that is **shot down** is reported as `left` (not `destroyed`).
 
 > Oil Rig crates and in-game `!commands` are **not** in v1 (Phase 3 — they need
 > monument-proximity detection and a synchronous chat reply).

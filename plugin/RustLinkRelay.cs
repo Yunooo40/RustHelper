@@ -21,7 +21,7 @@ using Oxide.Core.Plugins;
 
 namespace Oxide.Plugins
 {
-    [Info("RustLink Relay", "Yunooo40", "0.1.0")]
+    [Info("RustLink Relay", "Yunooo40", "0.1.1")]
     [Description("Relays Rust events (Heli, Chinook, Cargo, Bradley) to the RustLink Bot API.")]
     public class RustLinkRelay : RustPlugin
     {
@@ -103,6 +103,9 @@ namespace Oxide.Plugins
         }
 
         // ───────────────────────────── Hooks ─────────────────────────────
+        // NB perf : OnEntitySpawned est l'un des hooks les plus sollicités de Rust
+        // (appelé à chaque spawn d'entité). On sort au plus tôt et Classify ne fait
+        // que quelques type-checks ; sur un très gros serveur, surveiller le coût.
         private void OnEntitySpawned(BaseNetworkable entity)
         {
             if (!ready || entity == null) return;
@@ -139,11 +142,18 @@ namespace Oxide.Plugins
         private void SendEvent(string eventType, string status, bool withRespawn = false)
         {
             EventOption opt;
-            if (!config.Events.TryGetValue(eventType, out opt) || !opt.Enabled) return;
+            if (!config.Events.TryGetValue(eventType, out opt))
+            {
+                if (config.Debug) Puts($"Event '{eventType}' absent de la config — ignoré.");
+                return;
+            }
+            if (!opt.Enabled) return;
 
             long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
             long? nextRespawn = null;
-            if (opt.RespawnMinutes > 0 && (withRespawn || status == "spawned"))
+            // Le countdown estime la PROCHAINE occurrence : on ne le pose qu'à la
+            // fin d'un event (mort/départ, withRespawn), pas au spawn.
+            if (opt.RespawnMinutes > 0 && withRespawn)
                 nextRespawn = now + opt.RespawnMinutes * 60L;
 
             var payload = new Dictionary<string, object>
