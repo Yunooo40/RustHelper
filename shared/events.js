@@ -11,6 +11,7 @@ export const EVENTS = {
   helicopter: { label: 'Patrol Helicopter', emoji: '🚁', aliases: ['heli', 'patrol', 'patrol_helicopter'] },
   cargo: { label: 'Cargo Ship', emoji: '🚢', aliases: ['cargoship', 'cargo_ship'] },
   chinook: { label: 'Chinook (CH47)', emoji: '🪖', aliases: ['ch47', 'ch-47', 'crate'] },
+  bradley: { label: 'Bradley APC', emoji: '🛡️', aliases: ['bradleyapc', 'bradley_apc', 'apc', 'tank'] },
 };
 
 export const EVENT_KEYS = Object.keys(EVENTS);
