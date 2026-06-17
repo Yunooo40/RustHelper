@@ -33,7 +33,7 @@ RustLink-style companion, built with **discord.js + Express + SQLite**.
 **Auto notifications** — when the API receives an event, the bot posts a pretty embed
 (with a Discord auto-updating relative timestamp) in the configured channel.
 
-Tracked events: `oil_rig_small`, `oil_rig_large`, `deep_sea`, `helicopter`, `cargo`, `chinook`.
+Tracked events: `oil_rig_small`, `oil_rig_large`, `deep_sea`, `helicopter`, `cargo`, `chinook`, `bradley`.
 
 ---
 
@@ -190,7 +190,8 @@ The Rust/Oxide plugin should `POST /webhook/rust` with:
 ## 🗺️ Roadmap
 
 - [x] **Phase 1 — MVP:** Discord bot, slash commands, Express API, SQLite, webhook endpoint
-- [ ] **Phase 2 — Plugin integration:** Oxide plugin posts real events to the webhook
+- [~] **Phase 2 — Plugin integration:** Oxide/Carbon plugin posts real events to the webhook
+  → core events (Heli, Chinook, Cargo, Bradley) done — see [`plugin/`](plugin/README.md)
 - [ ] **Phase 3 — In-game commands:** relay `!small`, `!heli`, `!pop`, `!time` through the plugin
 - [ ] **Phase 4 — Polish:** player linking & death notifications, multi-server, PostgreSQL, deploy (Railway/Render/VPS)
 
