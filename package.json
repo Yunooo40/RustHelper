@@ -1,0 +1,32 @@
+{
+  "name": "rustlink-bot",
+  "version": "0.1.0",
+  "description": "Discord bot + REST API to track Rust game events (Oil Rig, Patrol Helicopter, Cargo Ship...). RustLink-style companion.",
+  "type": "module",
+  "main": "index.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js",
+    "api": "node index.js --api-only",
+    "deploy-commands": "node deploy-commands.js"
+  },
+  "keywords": [
+    "rust",
+    "discord",
+    "discord-bot",
+    "rustlink",
+    "oxide",
+    "game-tracker"
+  ],
+  "author": "Yunooo40",
+  "license": "MIT",
+  "dependencies": {
+    "better-sqlite3": "^12.11.1",
+    "discord.js": "^14.16.3",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2"
+  }
+}

@@ -1,0 +1,44 @@
+### RustLink API — quick manual tests (VS Code "REST Client" extension)
+### Set @secret to match WEBHOOK_SECRET in your .env (leave header off if empty).
+
+@base = http://localhost:3000
+@secret = change-me
+
+### Health check
+GET {{base}}/health
+
+### API info
+GET {{base}}/
+
+### Send a Rust event — Small Oil Rig spawns, respawns in ~30 min
+POST {{base}}/webhook/rust
+Content-Type: application/json
+x-webhook-secret: {{secret}}
+
+{
+  "server": "Atlas - EU 2X Medium",
+  "event": "oil_rig_small",
+  "status": "spawned",
+  "spawn_time": 1718614800,
+  "next_respawn": 1918631200,
+  "timestamp": "2024-06-17T10:00:00Z"
+}
+
+### List all timers
+GET {{base}}/timers
+
+### List timers for one server
+GET {{base}}/timers?server=Atlas - EU 2X Medium
+
+### Manually set a timer (Patrol Heli in 25 min)
+POST {{base}}/timers/set
+Content-Type: application/json
+x-webhook-secret: {{secret}}
+
+{ "server": "Atlas - EU 2X Medium", "event": "heli", "minutes": 25 }
+
+### Recent event history
+GET {{base}}/events
+
+### Tracked servers
+GET {{base}}/servers
