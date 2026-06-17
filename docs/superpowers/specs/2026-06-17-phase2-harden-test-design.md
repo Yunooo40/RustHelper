@@ -1,7 +1,7 @@
 # Phase 2 — Durcir + tester le plugin RustLinkRelay
 
 - **Date :** 2026-06-17
-- **Statut :** validé, prêt pour plan d'implémentation
+- **Statut :** livré — Volet A (19 tests verts) + Volet B (F1–F4 appliqués, plugin v0.1.1) le 2026-06-17
 - **Scope :** durcir et tester l'intégration Phase 2 existante (plugin Oxide/Carbon ↔ API webhook)
 
 ## Contexte
