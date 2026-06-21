@@ -17,10 +17,12 @@ straight from the Rust chat (see *In-game chat commands* below).
 > **Note:** the Discord countdown fires at the **end** of an event (destroy / leave),
 > not on spawn. A CH47 that is **shot down** is reported as `left` (not `destroyed`).
 
-> In-game `!commands` arrived in **v0.2.0** (Phase 3, below). **Auto** Oil Rig crate
-> detection (hacking the locked crate) is still deferred to Phase 3.2 — it needs
-> monument-proximity detection; for now players report Oil Rig / Deep Sea with `!small`,
-> `!large`, `!deep`.
+> In-game `!commands` arrived in **v0.2.0** (Phase 3, below). **v0.3.0** adds **auto Oil
+> Rig** detection: when the locked crate on the Small/Large Oil Rig starts being hacked,
+> the plugin posts `oil_rig_small`/`oil_rig_large` with a countdown to unlock — no `!small`
+> needed. ⚠️ This relies on Rust hook/monument names and is **not yet verified on a live
+> server**; enable `Debug` to check it, or set `Auto-detect Oil Rig crate hacks` to `false`.
+> Deep Sea Loot still has no auto-detection (report it with `!deep`).
 
 ---
 
@@ -79,6 +81,7 @@ compatible). Drop it into your server's plugin folder — it hot-loads, no resta
     "oil_rig_small": 15, "oil_rig_large": 15, "deep_sea": 0,
     "helicopter": 0, "cargo": 0, "bradley": 0, "chinook": 0
   },
+  "Auto-detect Oil Rig crate hacks (verify on a live server)": true,
   "Events": {
     "helicopter": { "Enabled": true, "Respawn estimate (minutes)": 0 },
     "chinook":    { "Enabled": true, "Respawn estimate (minutes)": 0 },
@@ -96,6 +99,9 @@ compatible). Drop it into your server's plugin folder — it hot-loads, no resta
 - **Server name** — must exactly match what you pass to `/setup <server_name>` in Discord,
   otherwise the bot can't route the notification to the right channel.
 - **Chat commands / prefix / reports** — see *In-game chat commands* above.
+- **Auto-detect Oil Rig crate hacks** — when `true` (default), the plugin posts an Oil Rig
+  event automatically the moment its locked crate starts being hacked. Set `false` to rely
+  on player `!small`/`!large` reports instead. *Needs live-server verification.*
 - **Respawn estimate** — minutes used for the Discord countdown. Rust events are not
   fixed-interval, so these are *estimates* (Bradley ~60 min is a reasonable default).
 
