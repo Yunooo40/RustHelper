@@ -59,12 +59,14 @@ export function singleTimerEmbed(server, timer) {
 }
 
 // Posted automatically when the webhook reports an event.
-export function notificationEmbed({ serverName, eventType, status, nextRespawn }) {
+// `source` ('webhook' | 'ingame' | 'manual') and `reportedBy` (player name) are
+// set for player reports relayed from the Rust chat (Phase 3).
+export function notificationEmbed({ serverName, eventType, status, nextRespawn, source, reportedBy }) {
   const embed = new EmbedBuilder()
     .setColor(COLOR)
     .setTitle(`${eventEmoji(eventType)} ${eventLabel(eventType)}`)
     .setDescription(`**${(status ?? 'event').toUpperCase()}** on **${serverName}**`)
-    .setFooter(FOOTER)
+    .setFooter(source === 'ingame' ? { text: 'RustLink · reported in-game' } : FOOTER)
     .setTimestamp();
 
   if (nextRespawn) {
@@ -72,6 +74,9 @@ export function notificationEmbed({ serverName, eventType, status, nextRespawn }
       name: 'Next',
       value: `${discordTime(nextRespawn, 'R')} \`(${formatCountdown(nextRespawn)})\``,
     });
+  }
+  if (reportedBy) {
+    embed.addFields({ name: 'Reported by', value: String(reportedBy), inline: true });
   }
   return embed;
 }

@@ -37,12 +37,18 @@ export function webhookRouter() {
     const spawnTime = toUnix(body.spawn_time);
     const nextRespawn = toUnix(body.next_respawn);
 
+    // Origin of the event: auto plugin event ('webhook'), in-game player report
+    // ('ingame'), or manual slash command ('manual'). Unknown values fall back to
+    // 'webhook' so a typo never corrupts the timer's source tag.
+    const source = ['ingame', 'manual', 'webhook'].includes(body.source) ? body.source : 'webhook';
+    const reportedBy = body.reporter ?? null;
+
     // Capture the server (auto-created if /setup hasn't run yet), log the event,
     // and refresh the active timer.
     const server = Servers.findOrCreateByName(serverName);
     Events.insert({ serverId: server.id, eventType, status, spawnTime, nextRespawn, payload: body });
     if (nextRespawn) {
-      Timers.upsert({ serverId: server.id, eventType, expiresAt: nextRespawn, status });
+      Timers.upsert({ serverId: server.id, eventType, expiresAt: nextRespawn, status, source });
     }
 
     // Tell the bot to post a notification (ignored if the bot isn't running).
@@ -53,6 +59,8 @@ export function webhookRouter() {
       status,
       spawnTime,
       nextRespawn,
+      source,
+      reportedBy,
     });
 
     return res.json({

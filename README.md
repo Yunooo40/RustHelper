@@ -4,8 +4,9 @@ A Discord bot + REST API that tracks **Rust** in-game events — Oil Rig crates,
 Helicopter, Cargo Ship, and more — and posts live timers/notifications to your Discord.
 RustLink-style companion, built with **discord.js + Express + SQLite**.
 
-> **Status:** Phase 1 (MVP) — Discord bot, API, database and webhook endpoint are
-> working. The live Rust/Oxide plugin integration is Phase 2 (see [Roadmap](#-roadmap)).
+> **Status:** Phase 2 done — Discord bot, API, SQLite and the Oxide/Carbon plugin
+> relay real Rust events end-to-end. Phase 3 (in-game chat commands: report + query)
+> is in progress (see [Roadmap](#-roadmap)).
 
 ---
 
@@ -184,15 +185,19 @@ The Rust/Oxide plugin should `POST /webhook/rust` with:
 - `event` accepts the canonical keys or aliases (`small`, `large`, `deep`, `heli`, `cargo`, `ch47`).
 - `spawn_time` / `next_respawn` accept unix **seconds**, **milliseconds**, or an ISO string.
 - Send the secret in the `x-webhook-secret` header when `WEBHOOK_SECRET` is set.
+- *(Phase 3, optional)* `source: "ingame"` + `reporter: "<player>"` mark a player report
+  relayed from the Rust chat; the notification then shows *reported in-game*.
 
 ---
 
 ## 🗺️ Roadmap
 
 - [x] **Phase 1 — MVP:** Discord bot, slash commands, Express API, SQLite, webhook endpoint
-- [~] **Phase 2 — Plugin integration:** Oxide/Carbon plugin posts real events to the webhook
-  → core events (Heli, Chinook, Cargo, Bradley) done — see [`plugin/`](plugin/README.md)
-- [ ] **Phase 3 — In-game commands:** relay `!small`, `!heli`, `!pop`, `!time` through the plugin
+- [x] **Phase 2 — Plugin integration:** Oxide/Carbon plugin posts real events (Heli, Chinook,
+  Cargo, Bradley) to the webhook, hardened + tested — see [`plugin/`](plugin/README.md)
+- [~] **Phase 3 — In-game commands:** relay through the plugin chat
+  → **report** (`!small` `!large` `!deep` `!heli` `!cargo` `!bradley` `!chinook`, `!report <event>`)
+    and **query** (`!rl` / `!timers`) done; auto Oil Rig crate detection deferred to 3.2
 - [ ] **Phase 4 — Polish:** player linking & death notifications, multi-server, PostgreSQL, deploy (Railway/Render/VPS)
 
 ---

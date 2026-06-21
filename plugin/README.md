@@ -1,10 +1,11 @@
-# 🔌 RustLinkRelay (Oxide / Carbon plugin) — Phase 2
+# 🔌 RustLinkRelay (Oxide / Carbon plugin) — Phase 2 + 3
 
 `RustLinkRelay.cs` runs on your **Rust server** and POSTs in-game events to the
 RustLink Bot API (`POST /webhook/rust`). The bot then posts timers/notifications
-to Discord.
+to Discord. Since v0.2.0 players can also **report events** and **query timers**
+straight from the Rust chat (see *In-game chat commands* below).
 
-**Events relayed (v1):**
+**Auto-relayed events:**
 
 | Event | When it fires | `status` | Discord countdown? |
 |---|---|---|---|
@@ -16,8 +17,30 @@ to Discord.
 > **Note:** the Discord countdown fires at the **end** of an event (destroy / leave),
 > not on spawn. A CH47 that is **shot down** is reported as `left` (not `destroyed`).
 
-> Oil Rig crates and in-game `!commands` are **not** in v1 (Phase 3 — they need
-> monument-proximity detection and a synchronous chat reply).
+> In-game `!commands` arrived in **v0.2.0** (Phase 3, below). **Auto** Oil Rig crate
+> detection (hacking the locked crate) is still deferred to Phase 3.2 — it needs
+> monument-proximity detection; for now players report Oil Rig / Deep Sea with `!small`,
+> `!large`, `!deep`.
+
+---
+
+## 💬 In-game chat commands (Phase 3)
+
+Players interact with RustLink without leaving Rust. Both the `!` prefix (configurable)
+and the standard `/` prefix work.
+
+| Command | Does |
+|---|---|
+| `!rl` · `!timers` · `!next` | Replies in chat with the **active timers** (reads the API). |
+| `!small` `!large` `!deep` | **Report** Oil Rig Small / Large / Deep Sea Loot (no auto-detection). |
+| `!heli` `!cargo` `!bradley` `!chinook` | **Report** these events manually. |
+| `!report <event>` | Report any event by key/alias (e.g. `!report patrol`). |
+
+- A **report** is relayed to Discord exactly like an auto event (notification + timer),
+  tagged *reported in-game* with the player's name. The timer length per event comes
+  from `Reports: timer minutes per event` (Oil Rigs default to 15 min; `0` = announce only).
+- **Anti-spam:** a per-player cooldown (default 60 s) and an optional `Reports: admin only`
+  switch. Set `Chat commands enabled` to `false` to disable the whole feature.
 
 ---
 
@@ -43,10 +66,19 @@ compatible). Drop it into your server's plugin folder — it hot-loads, no resta
 ```json
 {
   "Webhook URL": "http://localhost:3000/webhook/rust",
+  "API base URL (in-game queries; empty = derive from Webhook URL)": "",
   "Webhook secret (x-webhook-secret header, empty = none)": "",
   "Server name (MUST match /setup in Discord)": "My Rust Server",
   "Request timeout (seconds)": 10,
   "Debug logging": false,
+  "Chat commands enabled": true,
+  "Chat prefix for '!' style (the '/' forms always work)": "!",
+  "Reports: admin only": false,
+  "Reports: per-player cooldown (seconds)": 60,
+  "Reports: timer minutes per event (0 = announce only, no timer)": {
+    "oil_rig_small": 15, "oil_rig_large": 15, "deep_sea": 0,
+    "helicopter": 0, "cargo": 0, "bradley": 0, "chinook": 0
+  },
   "Events": {
     "helicopter": { "Enabled": true, "Respawn estimate (minutes)": 0 },
     "chinook":    { "Enabled": true, "Respawn estimate (minutes)": 0 },
@@ -58,9 +90,12 @@ compatible). Drop it into your server's plugin folder — it hot-loads, no resta
 
 - **Webhook URL** — where the bot API listens. Same machine → `localhost`. Different
   machine → use the API host's LAN IP or public URL (e.g. `http://192.168.1.20:3000/webhook/rust`).
+- **API base URL** — used by in-game queries (`!rl`) to read `GET /timers`. Leave empty to
+  derive it from the Webhook URL (strips `/webhook/rust`).
 - **Webhook secret** — must equal `WEBHOOK_SECRET` in the bot's `.env` (leave empty if the bot has none).
 - **Server name** — must exactly match what you pass to `/setup <server_name>` in Discord,
   otherwise the bot can't route the notification to the right channel.
+- **Chat commands / prefix / reports** — see *In-game chat commands* above.
 - **Respawn estimate** — minutes used for the Discord countdown. Rust events are not
   fixed-interval, so these are *estimates* (Bradley ~60 min is a reasonable default).
 
