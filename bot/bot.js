@@ -8,9 +8,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Client, Collection, GatewayIntentBits } from 'discord.js';
-import { bus, RUST_EVENT } from '../shared/bus.js';
+import { bus, RUST_EVENT, DEATH_EVENT } from '../shared/bus.js';
 import * as Servers from '../backend/models/server.js';
-import { notificationEmbed } from './lib/embeds.js';
+import { notificationEmbed, deathEmbed } from './lib/embeds.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -50,16 +50,27 @@ export async function createBot() {
   }
 
   // Bridge: API webhook -> Discord notification.
+  const sendToChannel = async (payload, embed) => {
+    const channelId = payload.channelId ?? Servers.findByName(payload.serverName)?.channel_id;
+    if (!channelId) return; // no channel configured yet (run /setup)
+    const channel = await client.channels.fetch(channelId).catch(() => null);
+    if (channel?.isTextBased()) await channel.send({ embeds: [embed] });
+  };
+
   bus.on(RUST_EVENT, async (payload) => {
     try {
-      const channelId = payload.channelId ?? Servers.findByName(payload.serverName)?.channel_id;
-      if (!channelId) return; // no channel configured yet (run /setup)
-      const channel = await client.channels.fetch(channelId).catch(() => null);
-      if (channel?.isTextBased()) {
-        await channel.send({ embeds: [notificationEmbed(payload)] });
-      }
+      await sendToChannel(payload, notificationEmbed(payload));
     } catch (err) {
       console.error('[bot] failed to deliver notification:', err);
+    }
+  });
+
+  // Kill feed (Phase 4.2).
+  bus.on(DEATH_EVENT, async (payload) => {
+    try {
+      await sendToChannel(payload, deathEmbed(payload));
+    } catch (err) {
+      console.error('[bot] failed to deliver death notification:', err);
     }
   });
 

@@ -19,6 +19,9 @@
 //              → claims the code shown by the Discord /link command, tying the
 //                player's Steam id to their Discord account (POST /link/claim).
 //
+// Phase 4.2 — death kill feed (opt-in: "Relay player deaths"):
+//   OnPlayerDeath → POST /webhook/death; linked players appear as Discord mentions.
+//
 // Repo: https://github.com/Yunooo40/RustHelper
 //
 // IMPORTANT: Rust updates monthly and entity/hook names can drift. If an event
@@ -36,8 +39,8 @@ using Oxide.Core.Plugins;
 
 namespace Oxide.Plugins
 {
-    [Info("RustLink Relay", "Yunooo40", "0.3.0")]
-    [Description("Relays Rust events (auto + in-game reports/queries/linking) to the RustLink Bot API.")]
+    [Info("RustLink Relay", "Yunooo40", "0.4.0")]
+    [Description("Relays Rust events (auto + reports/queries/linking + deaths) to the RustLink Bot API.")]
     public class RustLinkRelay : RustPlugin
     {
         // ───────────────────────────── Configuration ─────────────────────────────
@@ -73,6 +76,11 @@ namespace Oxide.Plugins
 
             [JsonProperty("Debug logging")]
             public bool Debug = false;
+
+            // ── Death kill feed (Phase 4.2) ──
+            // OFF by default: Rust deaths are frequent, so opt in per server.
+            [JsonProperty("Relay player deaths")]
+            public bool RelayDeaths = false;
 
             // ── In-game chat commands (Phase 3) ──
             [JsonProperty("Chat commands enabled")]
@@ -165,6 +173,64 @@ namespace Oxide.Plugins
             if (entity == null) return;
             if (entity is PatrolHelicopter) SendEvent("helicopter", "destroyed", withRespawn: true);
             else if (entity is BradleyAPC) SendEvent("bradley", "destroyed", withRespawn: true);
+        }
+
+        // Player deaths -> Discord kill feed (Phase 4.2). Opt-in via "Relay player deaths".
+        private void OnPlayerDeath(BasePlayer victim, HitInfo info)
+        {
+            if (!config.RelayDeaths || victim == null || victim.IsNpc) return; // real players only
+            SendDeath(victim, info);
+        }
+
+        // Extracts killer / cause / distance (best-effort — Rust fields drift) and POSTs
+        // to /webhook/death.
+        private void SendDeath(BasePlayer victim, HitInfo info)
+        {
+            string killerName = null, killerId = null, cause = null;
+            double distance = 0;
+            try
+            {
+                var killer = info?.InitiatorPlayer;
+                if (killer != null && !killer.IsNpc)
+                {
+                    killerName = killer.displayName;
+                    killerId = killer.UserIDString;
+                }
+                else if (info?.Initiator != null)
+                {
+                    killerName = info.Initiator.ShortPrefabName; // e.g. "bear", "autoturret"
+                }
+                if (info?.damageTypes != null) cause = info.damageTypes.GetMajorityDamageType().ToString();
+                if (info != null && info.ProjectileDistance > 0f) distance = Math.Round(info.ProjectileDistance, 1);
+            }
+            catch (Exception e) { if (config.Debug) PrintWarning("death parse: " + e.Message); }
+
+            var payload = new Dictionary<string, object>
+            {
+                ["server"] = config.ServerName,
+                ["victim_id"] = victim.UserIDString,
+                ["victim_name"] = victim.displayName,
+                ["timestamp"] = DateTime.UtcNow.ToString("o"),
+            };
+            if (!string.IsNullOrEmpty(killerName)) payload["killer_name"] = killerName;
+            if (!string.IsNullOrEmpty(killerId)) payload["killer_id"] = killerId;
+            if (!string.IsNullOrEmpty(cause)) payload["cause"] = cause;
+            if (distance > 0) payload["distance"] = distance;
+
+            string body = JsonConvert.SerializeObject(payload);
+            var headers = new Dictionary<string, string> { ["Content-Type"] = "application/json" };
+            if (!string.IsNullOrEmpty(config.WebhookSecret))
+                headers["x-webhook-secret"] = config.WebhookSecret;
+
+            if (config.Debug) Puts($"-> death {victim.displayName}: {body}");
+
+            webrequest.Enqueue(ApiBase() + "/webhook/death", body, (code, response) =>
+            {
+                if (code < 200 || code >= 300)
+                    PrintWarning($"death webhook failed HTTP {code}: {response}");
+                else if (config.Debug)
+                    Puts($"death ok HTTP {code}.");
+            }, this, RequestMethod.POST, headers, config.TimeoutSeconds * 1000f);
         }
 
         // Entities that despawn without "dying" (cargo leaves, chinook flies away).

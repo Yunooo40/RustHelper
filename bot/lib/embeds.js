@@ -80,3 +80,23 @@ export function notificationEmbed({ serverName, eventType, status, nextRespawn, 
   }
   return embed;
 }
+
+// Kill-feed entry (Phase 4.2). Linked players show as a (non-pinging) Discord
+// mention so the link is visible without spamming notifications on every death.
+export function deathEmbed({ serverName, victimName, victimDiscordId, killerName, killerDiscordId, cause, distance }) {
+  const victim = victimDiscordId ? `<@${victimDiscordId}>` : `**${victimName}**`;
+  const killer = killerName ? (killerDiscordId ? `<@${killerDiscordId}>` : `**${killerName}**`) : null;
+
+  const embed = new EmbedBuilder()
+    .setColor(COLOR)
+    .setTitle('☠️ Kill feed')
+    .setDescription(killer ? `${victim} was killed by ${killer}` : `${victim} died`)
+    .setFooter({ text: `RustLink · ${serverName}` })
+    .setTimestamp();
+
+  if (cause) embed.addFields({ name: 'Cause', value: String(cause), inline: true });
+  if (distance != null && Number(distance) > 0) {
+    embed.addFields({ name: 'Distance', value: `${Math.round(Number(distance))} m`, inline: true });
+  }
+  return embed;
+}

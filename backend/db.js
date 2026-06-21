@@ -76,6 +76,24 @@ db.exec(`
     created_at      TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
   );
+
+  -- Player death log (Phase 4.2): feeds the Discord kill feed + future stats.
+  -- victim_discord_id / killer_discord_id are resolved from the links table at insert.
+  CREATE TABLE IF NOT EXISTS deaths (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    server_id         INTEGER NOT NULL REFERENCES servers(id) ON DELETE CASCADE,
+    victim_id         TEXT,                       -- steam id
+    victim_name       TEXT,
+    killer_id         TEXT,                       -- steam id, null if NPC/environment
+    killer_name       TEXT,
+    cause             TEXT,
+    distance          REAL,
+    victim_discord_id TEXT,
+    killer_discord_id TEXT,
+    payload           TEXT,
+    created_at        TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_deaths_server ON deaths(server_id, created_at);
 `);
 
 export default db;

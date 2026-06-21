@@ -14,4 +14,9 @@ export const bus = new EventEmitter();
 // Payload shape: { serverName, eventType, status, spawnTime, nextRespawn }
 export const RUST_EVENT = 'rust-event';
 
+// Emitted by POST /webhook/death (Phase 4.2), consumed by the bot for the kill feed.
+// Payload: { serverName, channelId, victimName, victimDiscordId, killerName,
+//            killerDiscordId, cause, distance }
+export const DEATH_EVENT = 'death-event';
+
 export default bus;
