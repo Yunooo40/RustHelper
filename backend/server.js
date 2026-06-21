@@ -6,6 +6,7 @@ import { webhookRouter } from './routes/webhook.js';
 import { timersRouter } from './routes/timers.js';
 import { eventsRouter } from './routes/events.js';
 import { serversRouter } from './routes/servers.js';
+import { linkRouter } from './routes/link.js';
 
 export function createApiServer() {
   const app = express();
@@ -31,6 +32,8 @@ export function createApiServer() {
         'POST /timers/set',
         'GET  /events?server=<name>&limit=25',
         'GET  /servers',
+        'POST /link/claim',
+        'GET  /link?discord=<id>|steam=<id>',
       ],
     }),
   );
@@ -42,6 +45,7 @@ export function createApiServer() {
   app.use('/timer', timersRouter()); // alias so POST /timer/set also works
   app.use('/events', eventsRouter());
   app.use('/servers', serversRouter());
+  app.use('/link', linkRouter());
 
   // 404 + error handlers (kept last).
   app.use((_req, res) => res.status(404).json({ ok: false, error: 'Not found' }));

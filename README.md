@@ -20,6 +20,7 @@ RustLink-style companion, built with **discord.js + Express + SQLite**.
 | `/status` | Show all tracked event timers |
 | `/events` | List upcoming events, soonest first |
 | `/player <username>` | Player info (stub — needs plugin, later phase) |
+| `/link` · `/unlink` | Link / unlink your Discord ↔ Rust (Steam) account |
 
 **REST API (backend)**
 | Method & Path | Description |
@@ -29,6 +30,8 @@ RustLink-style companion, built with **discord.js + Express + SQLite**.
 | `POST /timers/set` | Manually create/refresh a timer |
 | `GET  /events?server=<name>` | Recent event history |
 | `GET  /servers` | List tracked servers |
+| `POST /link/claim` | Claim a link code from in-game (`!link <code>`) |
+| `GET  /link?discord=<id>` | Look up a Discord ↔ Steam link (also `?steam=`) |
 | `GET  /health` | Health check |
 
 **Auto notifications** — when the API receives an event, the bot posts a pretty embed
@@ -198,7 +201,10 @@ The Rust/Oxide plugin should `POST /webhook/rust` with:
 - [~] **Phase 3 — In-game commands:** relay through the plugin chat
   → **report** (`!small` `!large` `!deep` `!heli` `!cargo` `!bradley` `!chinook`, `!report <event>`)
     and **query** (`!rl` / `!timers`) done; auto Oil Rig crate detection deferred to 3.2
-- [ ] **Phase 4 — Polish:** player linking & death notifications, multi-server, PostgreSQL, deploy (Railway/Render/VPS)
+- [~] **Phase 4 — Polish:**
+  → **4.1** done: player linking — `/link` + in-game `!link <code>` ties Discord ↔ Steam
+    (`links`/`link_codes` tables, `POST /link/claim`, tested)
+  → next: death notifications (build on links), multi-server, PostgreSQL, deploy (Railway/Render/VPS)
 
 ---
 

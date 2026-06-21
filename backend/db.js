@@ -57,6 +57,25 @@ db.exec(`
     UNIQUE(server_id, event_type)
   );
   CREATE INDEX IF NOT EXISTS idx_timers_server ON timers(server_id, expires_at);
+
+  -- Pending link codes (Phase 4): shown in Discord via /link, claimed in-game
+  -- with !link <code>. Short-lived; one pending code per Discord user.
+  CREATE TABLE IF NOT EXISTS link_codes (
+    code            TEXT PRIMARY KEY,            -- short, non-ambiguous, uppercase
+    discord_user_id TEXT NOT NULL,
+    expires_at      INTEGER NOT NULL,            -- unix seconds
+    created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  -- Confirmed Discord <-> Steam links (MVP: one-to-one).
+  CREATE TABLE IF NOT EXISTS links (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    discord_user_id TEXT NOT NULL UNIQUE,
+    steam_id        TEXT NOT NULL UNIQUE,
+    steam_name      TEXT,
+    created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
+  );
 `);
 
 export default db;
