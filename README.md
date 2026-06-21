@@ -26,6 +26,7 @@ RustLink-style companion, built with **discord.js + Express + SQLite**.
 | Method & Path | Description |
 |---|---|
 | `POST /webhook/rust` | Receive an event from the Rust/Oxide plugin |
+| `POST /webhook/death` | Receive a player death for the kill feed |
 | `GET  /timers?server=<name>` | List active timers |
 | `POST /timers/set` | Manually create/refresh a timer |
 | `GET  /events?server=<name>` | Recent event history |
@@ -203,8 +204,9 @@ The Rust/Oxide plugin should `POST /webhook/rust` with:
     and **query** (`!rl` / `!timers`) done; auto Oil Rig crate detection deferred to 3.2
 - [~] **Phase 4 — Polish:**
   → **4.1** done: player linking — `/link` + in-game `!link <code>` ties Discord ↔ Steam
-    (`links`/`link_codes` tables, `POST /link/claim`, tested)
-  → next: death notifications (build on links), multi-server, PostgreSQL, deploy (Railway/Render/VPS)
+  → **4.2** done: death kill feed — opt-in plugin relay → `POST /webhook/death`, linked
+    players shown as Discord mentions (`deaths` table, tested)
+  → next: multi-server, PostgreSQL, deploy (Railway/Render/VPS)
 
 ---
 

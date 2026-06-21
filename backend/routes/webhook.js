@@ -14,9 +14,11 @@ import { verifyWebhookSecret } from '../middleware/auth.js';
 import * as Servers from '../models/server.js';
 import * as Events from '../models/event.js';
 import * as Timers from '../models/timer.js';
+import * as Deaths from '../models/death.js';
+import * as Link from '../models/link.js';
 import { resolveEvent } from '../../shared/events.js';
 import { toUnix } from '../../shared/time.js';
-import { bus, RUST_EVENT } from '../../shared/bus.js';
+import { bus, RUST_EVENT, DEATH_EVENT } from '../../shared/bus.js';
 
 export function webhookRouter() {
   const router = Router();
@@ -69,6 +71,48 @@ export function webhookRouter() {
       event: eventType,
       status,
       next_respawn: nextRespawn,
+    });
+  });
+
+  // POST /webhook/death — a player died (Phase 4.2). Resolves linked Discord users
+  // (victim/killer) for the kill feed, logs the death, and notifies the bot.
+  router.post('/death', verifyWebhookSecret, (req, res) => {
+    const body = req.body ?? {};
+    if (!body.server || !body.victim_name) {
+      return res.status(400).json({ ok: false, error: 'Missing "server" or "victim_name"' });
+    }
+
+    const server = Servers.findOrCreateByName(body.server);
+    const victimDiscordId = body.victim_id ? Link.findBySteam(body.victim_id)?.discord_user_id ?? null : null;
+    const killerDiscordId = body.killer_id ? Link.findBySteam(body.killer_id)?.discord_user_id ?? null : null;
+
+    Deaths.insert({
+      serverId: server.id,
+      victimId: body.victim_id ?? null,
+      victimName: body.victim_name,
+      killerId: body.killer_id ?? null,
+      killerName: body.killer_name ?? null,
+      cause: body.cause ?? null,
+      distance: body.distance ?? null,
+      victimDiscordId,
+      killerDiscordId,
+      payload: body,
+    });
+
+    bus.emit(DEATH_EVENT, {
+      serverName: server.name,
+      channelId: server.channel_id,
+      victimName: body.victim_name,
+      victimDiscordId,
+      killerName: body.killer_name ?? null,
+      killerDiscordId,
+      cause: body.cause ?? null,
+      distance: body.distance ?? null,
+    });
+
+    return res.json({
+      ok: true,
+      death: { victim: body.victim_name, killer: body.killer_name ?? null, victimDiscordId },
     });
   });
 
