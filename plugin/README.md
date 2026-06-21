@@ -35,6 +35,7 @@ and the standard `/` prefix work.
 | `!small` `!large` `!deep` | **Report** Oil Rig Small / Large / Deep Sea Loot (no auto-detection). |
 | `!heli` `!cargo` `!bradley` `!chinook` | **Report** these events manually. |
 | `!report <event>` | Report any event by key/alias (e.g. `!report patrol`). |
+| `!link <code>` | Link your Steam account to Discord — get the code from `/link` in Discord (Phase 4). |
 
 - A **report** is relayed to Discord exactly like an auto event (notification + timer),
   tagged *reported in-game* with the player's name. The timer length per event comes

@@ -14,9 +14,9 @@ const { db } = await import('../../backend/db.js');
 export { config, db };
 export const app = createApiServer();
 
-// Vide les 3 tables entre les tests (la DB :memory: persiste sur tout le fichier).
+// Vide les tables entre les tests (la DB :memory: persiste sur tout le fichier).
 export function resetDb() {
-  db.exec('DELETE FROM timers; DELETE FROM events; DELETE FROM servers;');
+  db.exec('DELETE FROM timers; DELETE FROM events; DELETE FROM servers; DELETE FROM links; DELETE FROM link_codes;');
 }
 
 // Démarre l'app sur un port éphémère. Retourne { url, close }.
