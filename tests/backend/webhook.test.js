@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { db, config, resetDb, startTestServer } from '../helpers/testApp.js';
 import { bus, RUST_EVENT } from '../../shared/bus.js';
 import { PLUGIN_PAYLOADS } from '../fixtures/plugin-payloads.js';
+import { INGAME_PAYLOADS } from '../fixtures/ingame-payloads.js';
 
 let server;
 before(async () => { server = await startTestServer(); });
@@ -109,5 +110,79 @@ test('contrat: tous les payloads du plugin sont acceptés', async () => {
     const timer = db.prepare('SELECT * FROM timers WHERE event_type = ?').get(p.expectedEvent);
     if (p.expectTimer) assert.ok(timer, `${p.name}: timer attendu`);
     else assert.equal(timer, undefined, `${p.name}: pas de timer attendu`);
+  }
+});
+
+// ───────────────────────── Phase 3 : report in-game ─────────────────────────
+
+test('report in-game: source=ingame + reporter → timer tagué + bus enrichi', async () => {
+  const now = Math.floor(Date.now() / 1000);
+  const next = now + 900;
+  const emitted = new Promise((resolve) => bus.once(RUST_EVENT, resolve));
+
+  const res = await post('/webhook/rust', {
+    server: 'Atlas EU', event: 'small', status: 'called',
+    source: 'ingame', reporter: 'BigPete', spawn_time: now, next_respawn: next,
+  });
+
+  assert.equal(res.status, 200);
+  assert.equal((await res.json()).event, 'oil_rig_small');
+
+  // L'event loggé garde source + reporter dans le payload brut.
+  const evt = db.prepare("SELECT * FROM events WHERE event_type='oil_rig_small'").get();
+  assert.ok(evt, 'event inséré');
+  const raw = JSON.parse(evt.payload);
+  assert.equal(raw.source, 'ingame');
+  assert.equal(raw.reporter, 'BigPete');
+
+  // Le timer est tagué source='ingame'.
+  const timer = db.prepare("SELECT * FROM timers WHERE event_type='oil_rig_small'").get();
+  assert.ok(timer, 'timer upserté');
+  assert.equal(timer.source, 'ingame');
+
+  // Le bus transporte source + reportedBy pour la notif Discord.
+  const payload = await emitted;
+  assert.equal(payload.source, 'ingame');
+  assert.equal(payload.reportedBy, 'BigPete');
+});
+
+test('report in-game: source inconnu → retombe sur "webhook"', async () => {
+  const now = Math.floor(Date.now() / 1000);
+  const res = await post('/webhook/rust', {
+    server: 'S7', event: 'bradley', status: 'destroyed',
+    source: 'pirate', spawn_time: now, next_respawn: now + 60,
+  });
+  assert.equal(res.status, 200);
+  const timer = db.prepare("SELECT * FROM timers WHERE event_type='bradley'").get();
+  assert.equal(timer.source, 'webhook');
+});
+
+test('events auto (sans source): bus.reportedBy=null, timer source=webhook', async () => {
+  const now = Math.floor(Date.now() / 1000);
+  const emitted = new Promise((resolve) => bus.once(RUST_EVENT, resolve));
+  const res = await post('/webhook/rust', {
+    server: 'S8', event: 'cargo', status: 'left', spawn_time: now, next_respawn: now + 60,
+  });
+  assert.equal(res.status, 200);
+  const timer = db.prepare("SELECT * FROM timers WHERE event_type='cargo'").get();
+  assert.equal(timer.source, 'webhook');
+  const payload = await emitted;
+  assert.equal(payload.reportedBy, null);
+  assert.equal(payload.source, 'webhook');
+});
+
+test('contrat: tous les payloads in-game sont acceptés', async () => {
+  for (const p of INGAME_PAYLOADS) {
+    const res = await post('/webhook/rust', p.body);
+    assert.equal(res.status, 200, `${p.name} devrait passer (200)`);
+    const body = await res.json();
+    assert.equal(body.event, p.expectedEvent, `${p.name}: event canonique`);
+    const timer = db.prepare('SELECT * FROM timers WHERE event_type = ?').get(p.expectedEvent);
+    if (p.expectTimer) {
+      assert.ok(timer, `${p.name}: timer attendu`);
+      assert.equal(timer.source, 'ingame', `${p.name}: timer tagué ingame`);
+    } else {
+      assert.equal(timer, undefined, `${p.name}: pas de timer attendu`);
+    }
   }
 });
