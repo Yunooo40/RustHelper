@@ -72,6 +72,7 @@ compatible). Drop it into your server's plugin folder — it hot-loads, no resta
   "Server name (MUST match /setup in Discord)": "My Rust Server",
   "Request timeout (seconds)": 10,
   "Debug logging": false,
+  "Relay player deaths": false,
   "Chat commands enabled": true,
   "Chat prefix for '!' style (the '/' forms always work)": "!",
   "Reports: admin only": false,
@@ -97,6 +98,9 @@ compatible). Drop it into your server's plugin folder — it hot-loads, no resta
 - **Server name** — must exactly match what you pass to `/setup <server_name>` in Discord,
   otherwise the bot can't route the notification to the right channel.
 - **Chat commands / prefix / reports** — see *In-game chat commands* above.
+- **Relay player deaths** — when `true`, every player death is POSTed to `/webhook/death`
+  and shown in the Discord kill feed (linked players appear as mentions). Off by default
+  because Rust deaths are frequent. *Needs live-server verification.*
 - **Respawn estimate** — minutes used for the Discord countdown. Rust events are not
   fixed-interval, so these are *estimates* (Bradley ~60 min is a reasonable default).
 
