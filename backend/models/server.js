@@ -126,6 +126,14 @@ export function removeByGuildName(guildId, name) {
   return { removed: true, newDefault };
 }
 
+// Admin/API removal by name, with NO guild context (used by DELETE /servers/:name):
+// deletes EVERY server row matching `name` (case-insensitive) and — via ON DELETE
+// CASCADE — their events/timers/deaths. Returns the count of server rows removed.
+// Handy to purge orphan capture rows (NULL guild_id) the webhook made before /setup.
+export function removeByName(name) {
+  return db.prepare('DELETE FROM servers WHERE name = ? COLLATE NOCASE').run(name).changes;
+}
+
 // Resolve which server a command targets: an explicit name (case-insensitive), or
 // the guild's default when no name is given. Returns the row or undefined.
 export function resolve(guildId, name) {

@@ -35,6 +35,7 @@ RustLink-style companion, built with **discord.js + Express + SQLite**.
 | `POST /timers/set` | Manually create/refresh a timer |
 | `GET  /events?server=<name>` | Recent event history |
 | `GET  /servers` | List tracked servers |
+| `DELETE /servers/:name` | Admin: delete a server by name (+ cascade its events/timers/deaths) — needs the webhook secret |
 | `POST /link/claim` | Claim a link code from in-game (`!link <code>`) |
 | `GET  /link?discord=<id>` | Look up a Discord ↔ Steam link (also `?steam=`) |
 | `GET  /health` | Health check |

@@ -88,6 +88,19 @@ test('removeByGuildName: nom absent → removed=false', () => {
   assert.deepEqual(Servers.removeByGuildName(G, 'Ghost'), { removed: false, newDefault: null });
 });
 
+test('removeByName: supprime toutes les rows du nom (insensible casse) + orphelines', () => {
+  Servers.addServer({ guildId: G, name: 'Atlas', channelId: 'c1' }); // row de guild
+  db.prepare('INSERT INTO servers (name) VALUES (?)').run('Atlas');   // orpheline (guild NULL), même nom
+  Servers.addServer({ guildId: G, name: 'Keep' });                   // ne doit PAS partir
+  const removed = Servers.removeByName('atlas');
+  assert.equal(removed, 2, 'la row du guild + l’orpheline du même nom');
+  assert.deepEqual(Servers.list().map((s) => s.name), ['Keep']);
+});
+
+test('removeByName: nom absent → 0', () => {
+  assert.equal(Servers.removeByName('Ghost'), 0);
+});
+
 test('resolve: nom explicite, sinon défaut, sinon undefined', () => {
   const a = Servers.addServer({ guildId: G, name: 'Atlas' });
   const b = Servers.addServer({ guildId: G, name: 'Nomad' });
