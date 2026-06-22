@@ -17,7 +17,9 @@ export const config = {
   },
 
   api: {
-    port: Number(env.API_PORT ?? 3000),
+    // Cloud hosts (Railway/Render/Heroku) inject PORT — honour it first, then the
+    // local API_PORT override, then a dev default.
+    port: Number(env.PORT ?? env.API_PORT ?? 3000),
     // Shared secret expected from the Rust plugin. Empty = auth disabled (dev only).
     webhookSecret: env.WEBHOOK_SECRET ?? '',
   },

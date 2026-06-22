@@ -212,16 +212,22 @@ The Rust/Oxide plugin should `POST /webhook/rust` with:
     players shown as Discord mentions (`deaths` table, tested)
   → **4.3** done: K/D stats & leaderboard — `/stats` + `/leaderboard` computed from the
     `deaths` table (suicides/NPC handled, best streak, tested)
-  → next: multi-server, PostgreSQL, deploy (Railway/Render/VPS)
+- [~] **Phase 5 — Deploy:** run the API + bot live 24/7 on **Railway**, SQLite on a
+  persistent volume, so a real Rust server can reach the webhook — deploy config +
+  guide done ([`DEPLOY.md`](DEPLOY.md)); pending an actual Railway project + live test
+  → later: multi-server, PostgreSQL migration, per-user DM opt-in
 
 ---
 
 ## 🚢 Deployment notes
 
+**Full step-by-step guide: [`DEPLOY.md`](DEPLOY.md)** (Railway + SQLite on a volume).
+
 - Set `NODE_ENV=production` and a strong `WEBHOOK_SECRET`.
-- Use a process manager (`pm2`, systemd) or a host like **Railway / Render / Fly.io**.
+- The app binds the host-injected `PORT` automatically; keep the SQLite file on a
+  persistent volume (`DATABASE_PATH=/data/rustlink.sqlite`).
 - SQLite is fine to start; switch the `backend/models` layer to PostgreSQL when you
-  outgrow a single file. Keep the DB on a persistent volume.
+  outgrow a single file.
 
 ## 📄 License
 
