@@ -200,8 +200,10 @@ The Rust/Oxide plugin should `POST /webhook/rust` with:
 - [x] **Phase 2 — Plugin integration:** Oxide/Carbon plugin posts real events (Heli, Chinook,
   Cargo, Bradley) to the webhook, hardened + tested — see [`plugin/`](plugin/README.md)
 - [~] **Phase 3 — In-game commands:** relay through the plugin chat
-  → **report** (`!small` `!large` `!deep` `!heli` `!cargo` `!bradley` `!chinook`, `!report <event>`)
-    and **query** (`!rl` / `!timers`) done; auto Oil Rig crate detection deferred to 3.2
+  → **3.1** done & merged: **report** (`!small` `!large` `!deep` `!heli` `!cargo` `!bradley`
+    `!chinook`, `!report <event>`) + **query** (`!rl` / `!timers`)
+  → **3.2** done & merged (plugin v0.5.0): **auto Oil Rig** crate-hack detection
+    (`OnCrateHack` + monument filter) — ⚠️ pending live-server verification
 - [~] **Phase 4 — Polish:**
   → **4.1** done: player linking — `/link` + in-game `!link <code>` ties Discord ↔ Steam
   → **4.2** done: death kill feed — opt-in plugin relay → `POST /webhook/death`, linked

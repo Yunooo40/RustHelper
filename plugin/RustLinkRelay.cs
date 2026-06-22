@@ -14,6 +14,10 @@
 //              → players announce events the plugin can't auto-detect (Oil Rig,
 //                Deep Sea…). Sent with source:"ingame" + reporter:<player>.
 //
+// Phase 3.2 — auto Oil Rig: detects when the locked crate on the Small/Large Oil
+// Rig starts being hacked (OnCrateHack + monument filter) and posts a countdown to
+// unlock automatically. Toggle: "Auto-detect Oil Rig crate hacks".
+//
 // Phase 4 — account linking:
 //   • !link <code>  (also /link <code>)
 //              → claims the code shown by the Discord /link command, tying the
@@ -36,11 +40,12 @@ using Newtonsoft.Json;
 using Oxide.Core.Libraries;
 using Oxide.Core.Libraries.Covalence;
 using Oxide.Core.Plugins;
+using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("RustLink Relay", "Yunooo40", "0.4.0")]
-    [Description("Relays Rust events (auto + reports/queries/linking + deaths) to the RustLink Bot API.")]
+    [Info("RustLink Relay", "Yunooo40", "0.5.0")]
+    [Description("Relays Rust events (auto + Oil Rig + reports/queries/linking + deaths) to the RustLink Bot API.")]
     public class RustLinkRelay : RustPlugin
     {
         // ───────────────────────────── Configuration ─────────────────────────────
@@ -76,6 +81,10 @@ namespace Oxide.Plugins
 
             [JsonProperty("Debug logging")]
             public bool Debug = false;
+
+            // ── Oil Rig auto-detect (Phase 3.2) ──
+            [JsonProperty("Auto-detect Oil Rig crate hacks (verify on a live server)")]
+            public bool AutoOilRig = true;
 
             // ── Death kill feed (Phase 4.2) ──
             // OFF by default: Rust deaths are frequent, so opt in per server.
@@ -248,6 +257,66 @@ namespace Oxide.Plugins
             if (entity is CargoShip) return "cargo";
             if (entity is BradleyAPC) return "bradley";
             return null;
+        }
+
+        // ───────────────────────── Oil Rig crate hack (Phase 3.2) ─────────────────────
+        // Fires when a player STARTS hacking a locked crate. We only care about the
+        // crate sitting on the Small / Large Oil Rig — the heli- and cargo-dropped
+        // crates are filtered out by monument proximity. Sent as an auto event
+        // (source omitted → API stores source='webhook'), with a countdown to unlock.
+        //
+        // DRIFT WARNING (Rust updates monthly): the hook name `OnCrateHack`, the type
+        // `HackableLockedCrate`, its timing fields, and the monument names below can
+        // all change. Everything is guarded; verify on a live server (enable Debug).
+        private void OnCrateHack(HackableLockedCrate crate)
+        {
+            if (!config.AutoOilRig || crate == null) return;
+
+            string ev = WhichOilRig(crate.transform.position);
+            if (ev == null)
+            {
+                if (config.Debug) Puts("Crate hack ignored (not on an Oil Rig).");
+                return;
+            }
+
+            long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            long remaining = OilRigUnlockSeconds(crate, ev);
+            long? next = remaining > 0 ? now + remaining : (long?)null;
+
+            if (config.Debug) Puts($"Oil Rig crate hack detected: {ev}, unlock in {remaining}s.");
+            PostEvent(ev, "called", now, next, source: null, reporter: null);
+        }
+
+        // Which Oil Rig (if any) contains this world position. Null = not an Oil Rig.
+        private string WhichOilRig(Vector3 pos)
+        {
+            var monuments = TerrainMeta.Path?.Monuments;
+            if (monuments == null) return null;
+            foreach (var mon in monuments)
+            {
+                if (mon == null || !mon.IsInBounds(pos)) continue;
+                string n = (mon.name ?? "").ToLowerInvariant();
+                if (n.Contains("oilrig_1") || n.Contains("oil_rig_1")) return "oil_rig_small";
+                if (n.Contains("oilrig_2") || n.Contains("oil_rig_2")) return "oil_rig_large";
+            }
+            return null;
+        }
+
+        // Seconds until the crate unlocks. Reads the crate's own timer when possible,
+        // else falls back to the configured ReportMinutes (then 900 s = 15 min).
+        private long OilRigUnlockSeconds(HackableLockedCrate crate, string ev)
+        {
+            try
+            {
+                float remaining = crate.requiredHackSeconds - crate.hackSeconds;
+                if (remaining > 0f) return (long)remaining;
+            }
+            catch { /* field drift — fall back below */ }
+
+            int minutes;
+            if (config.ReportMinutes.TryGetValue(ev, out minutes) && minutes > 0)
+                return minutes * 60L;
+            return 900L;
         }
 
         // ───────────────────────── In-game chat commands ─────────────────────────
