@@ -4,9 +4,10 @@ A Discord bot + REST API that tracks **Rust** in-game events — Oil Rig crates,
 Helicopter, Cargo Ship, and more — and posts live timers/notifications to your Discord.
 RustLink-style companion, built with **discord.js + Express + SQLite**.
 
-> **Status:** Phase 2 done — Discord bot, API, SQLite and the Oxide/Carbon plugin
-> relay real Rust events end-to-end. Phase 3 (in-game chat commands: report + query)
-> is in progress (see [Roadmap](#-roadmap)).
+> **Status:** Phases 1–6 done — Discord bot, API, SQLite, the Oxide/Carbon plugin,
+> in-game chat commands, player linking, K/D stats and multi-server tracking all work
+> end-to-end (68 tests green). Next: a live **Railway** deploy so a real Rust server can
+> reach the webhook (see [Deployment](DEPLOY.md) + [Roadmap](#-roadmap)).
 
 ---
 
