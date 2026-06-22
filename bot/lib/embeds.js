@@ -140,3 +140,18 @@ export function leaderboardEmbed({ serverName, rows }) {
   );
   return embed;
 }
+
+// List of the Rust servers a guild tracks (Phase 6). ⭐ marks the default.
+export function serverListEmbed(servers) {
+  const lines = servers.map((s) => {
+    const star = s.is_default ? '⭐' : '•';
+    const chan = s.channel_id ? ` → <#${s.channel_id}>` : ' _(no channel set)_';
+    return `${star} **${s.name}**${chan}`;
+  });
+  return new EmbedBuilder()
+    .setColor(COLOR)
+    .setTitle('🗂️ Tracked Rust servers')
+    .setDescription(lines.join('\n'))
+    .setFooter({ text: 'RustLink · ⭐ default · /server-default to change' })
+    .setTimestamp();
+}

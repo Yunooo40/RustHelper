@@ -1,12 +1,13 @@
-// /setup <server_name> [channel] — link this Discord guild to a Rust server
-// and choose where notifications are posted. Requires "Manage Server".
+// /setup <server_name> [channel] — add a Rust server to this Discord and choose where
+// its notifications go. A guild can track several servers (Phase 6); the first one
+// becomes the default. Requires "Manage Server".
 import { SlashCommandBuilder, PermissionFlagsBits, ChannelType, EmbedBuilder, MessageFlags } from 'discord.js';
 import * as Servers from '../../backend/models/server.js';
 
 export default {
   data: new SlashCommandBuilder()
     .setName('setup')
-    .setDescription('Link this Discord server to a Rust server and set the notification channel.')
+    .setDescription('Track a Rust server on this Discord and set its notification channel.')
     .addStringOption((o) =>
       o
         .setName('server_name')
@@ -16,7 +17,7 @@ export default {
     .addChannelOption((o) =>
       o
         .setName('channel')
-        .setDescription('Channel for event notifications (defaults to the current channel).')
+        .setDescription("Channel for this server's notifications (defaults to the current channel).")
         .addChannelTypes(ChannelType.GuildText),
     )
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
@@ -28,13 +29,17 @@ export default {
 
     const name = interaction.options.getString('server_name', true);
     const channel = interaction.options.getChannel('channel') ?? interaction.channel;
-
-    const server = Servers.upsertByGuild({ guildId: interaction.guildId, name, channelId: channel.id });
+    const server = Servers.addServer({ guildId: interaction.guildId, name, channelId: channel.id });
+    const isDefault = server.is_default === 1;
 
     const embed = new EmbedBuilder()
       .setColor(0xce422b)
       .setTitle('✅ RustLink configured')
-      .setDescription(`Now tracking **${server.name}**.\nNotifications will be posted in <#${channel.id}>.`)
+      .setDescription(
+        `Now tracking **${server.name}**${isDefault ? ' _(default server)_' : ''}.\n` +
+          `Notifications will be posted in <#${channel.id}>.` +
+          (isDefault ? '' : '\nMake it the default with `/server-default`, or list all with `/servers`.'),
+      )
       .setFooter({ text: 'RustLink' });
 
     return interaction.reply({ embeds: [embed] });

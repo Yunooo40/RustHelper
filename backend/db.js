@@ -19,17 +19,60 @@ export const db = new Database(config.db.path);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 
+// ── Migrations ────────────────────────────────────────────────────────────────
+// Phase 6 — multi-server per guild. The old schema had `guild_id UNIQUE` (one Rust
+// server per Discord). We drop that constraint; SQLite can't drop an inline
+// constraint, so we rebuild `servers` preserving ids (hence the events/timers/deaths
+// foreign keys). Idempotent (no-op once `is_default` exists), exported for unit tests.
+export function migrateServers(database) {
+  const cols = database.prepare("PRAGMA table_info('servers')").all();
+  if (cols.length === 0) return; // fresh DB — the schema below creates the new table
+  if (cols.some((c) => c.name === 'is_default')) return; // already migrated
+
+  database.pragma('foreign_keys = OFF');
+  database.transaction(() => {
+    database.exec(`
+      CREATE TABLE servers_new (
+        id             INTEGER PRIMARY KEY AUTOINCREMENT,
+        guild_id       TEXT,
+        name           TEXT NOT NULL,
+        channel_id     TEXT,
+        webhook_secret TEXT,
+        is_default     INTEGER NOT NULL DEFAULT 0,
+        timezone       TEXT NOT NULL DEFAULT 'UTC',
+        created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at     TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE(guild_id, name)
+      );
+      INSERT INTO servers_new
+        (id, guild_id, name, channel_id, webhook_secret, is_default, timezone, created_at, updated_at)
+        SELECT id, guild_id, name, channel_id, webhook_secret,
+               CASE WHEN guild_id IS NOT NULL THEN 1 ELSE 0 END,
+               timezone, created_at, updated_at
+        FROM servers;
+      DROP TABLE servers;
+      ALTER TABLE servers_new RENAME TO servers;
+    `);
+  })();
+  database.pragma('foreign_keys = ON');
+}
+
+migrateServers(db);
+
 db.exec(`
-  -- Rust servers being tracked. One Discord guild tracks one Rust server (MVP).
+  -- Rust servers tracked. A Discord guild can track MANY Rust servers (Phase 6); one
+  -- of them is the guild's default (is_default) for commands without a server arg.
   CREATE TABLE IF NOT EXISTS servers (
     id             INTEGER PRIMARY KEY AUTOINCREMENT,
-    guild_id       TEXT UNIQUE,                 -- Discord guild id (null until /setup)
+    guild_id       TEXT,                        -- Discord guild id (null until /setup; not unique, many per guild)
     name           TEXT NOT NULL,               -- Rust server display name (match key for webhooks)
     channel_id     TEXT,                        -- Discord channel id for notifications
     webhook_secret TEXT,                        -- optional per-server secret (overrides global)
+    is_default     INTEGER NOT NULL DEFAULT 0,  -- the guild's default server (one per guild)
     timezone       TEXT NOT NULL DEFAULT 'UTC',
     created_at     TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at     TEXT NOT NULL DEFAULT (datetime('now'))
+    updated_at     TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(guild_id, name)
   );
 
   -- Append-only log of every event received (audit / history / debugging).

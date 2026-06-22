@@ -15,10 +15,12 @@ RustLink-style companion, built with **discord.js + Express + SQLite**.
 **Slash commands (Discord)**
 | Command | Description |
 |---|---|
-| `/setup <server_name> [channel]` | Link this Discord server to a Rust server + pick the notification channel |
-| `/timer <event> <minutes>` | Manually set a countdown (admin) |
-| `/status` | Show all tracked event timers |
-| `/events` | List upcoming events, soonest first |
+| `/setup <server_name> [channel]` | **Track a Rust server** + pick its channel — a Discord can track several (the first becomes the default) |
+| `/servers` | List the Rust servers this Discord tracks (⭐ = default) |
+| `/server-default <name>` · `/server-remove <name>` | Set the default / stop tracking a server (admin) |
+| `/timer <event> <minutes> [server]` | Manually set a countdown (admin) |
+| `/status [server]` | Show all tracked event timers |
+| `/events [server]` | List upcoming events, soonest first |
 | `/player <username>` | Player info (stub — needs plugin, later phase) |
 | `/link` · `/unlink` | Link / unlink your Discord ↔ Rust (Steam) account |
 | `/stats [player]` | K/D stats for a linked player (yours by default) |
@@ -215,7 +217,11 @@ The Rust/Oxide plugin should `POST /webhook/rust` with:
 - [~] **Phase 5 — Deploy:** run the API + bot live 24/7 on **Railway**, SQLite on a
   persistent volume, so a real Rust server can reach the webhook — deploy config +
   guide done ([`DEPLOY.md`](DEPLOY.md)); pending an actual Railway project + live test
-  → later: multi-server, PostgreSQL migration, per-user DM opt-in
+- [x] **Phase 6 — Multi-server:** one Discord can track **several Rust servers** —
+  `/setup` adds servers (first = default), `/servers` lists them, `/server-default` &
+  `/server-remove` manage them, and `/status` `/events` `/timer` take an optional
+  `server:` argument (idempotent schema migration, model + commands tested)
+  → later: PostgreSQL migration, per-user DM opt-in, per-server stats
 
 ---
 

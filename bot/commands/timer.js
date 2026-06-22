@@ -1,11 +1,12 @@
-// /timer <event> <minutes> — manually set a countdown (admin / for testing
-// before the live plugin is wired up). Requires "Manage Server".
-import { SlashCommandBuilder, PermissionFlagsBits, MessageFlags } from 'discord.js';
-import * as Servers from '../../backend/models/server.js';
+// /timer <event> <minutes> [server] — manually set a countdown (admin / for testing
+// before the live plugin is wired up). Uses the guild's default server unless `server`
+// is given. Requires "Manage Server".
+import { SlashCommandBuilder, PermissionFlagsBits } from 'discord.js';
 import * as Timers from '../../backend/models/timer.js';
 import { EVENT_CHOICES } from '../../shared/events.js';
 import { nowUnix } from '../../shared/time.js';
 import { singleTimerEmbed } from '../lib/embeds.js';
+import { resolveServerOrReply } from '../lib/resolveServer.js';
 
 export default {
   data: new SlashCommandBuilder()
@@ -22,13 +23,14 @@ export default {
         .setMinValue(0)
         .setMaxValue(1440),
     )
+    .addStringOption((o) =>
+      o.setName('server').setDescription("Which tracked server (defaults to this guild's default)."),
+    )
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
 
   async execute(interaction) {
-    const server = Servers.findByGuild(interaction.guildId);
-    if (!server) {
-      return interaction.reply({ content: 'Run `/setup <server_name>` first.', flags: MessageFlags.Ephemeral });
-    }
+    const server = await resolveServerOrReply(interaction);
+    if (!server) return;
 
     const eventType = interaction.options.getString('event', true);
     const minutes = interaction.options.getInteger('minutes', true);

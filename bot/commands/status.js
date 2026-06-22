@@ -1,17 +1,21 @@
-// /status — show all tracked event timers for this guild's Rust server.
-import { SlashCommandBuilder, MessageFlags } from 'discord.js';
-import * as Servers from '../../backend/models/server.js';
+// /status [server] — show all tracked event timers for a Rust server (the guild's
+// default when no server is given).
+import { SlashCommandBuilder } from 'discord.js';
 import * as Timers from '../../backend/models/timer.js';
 import { statusEmbed } from '../lib/embeds.js';
+import { resolveServerOrReply } from '../lib/resolveServer.js';
 
 export default {
-  data: new SlashCommandBuilder().setName('status').setDescription('Show the status of all tracked events.'),
+  data: new SlashCommandBuilder()
+    .setName('status')
+    .setDescription('Show the status of all tracked events.')
+    .addStringOption((o) =>
+      o.setName('server').setDescription("Which tracked server (defaults to this guild's default)."),
+    ),
 
   async execute(interaction) {
-    const server = Servers.findByGuild(interaction.guildId);
-    if (!server) {
-      return interaction.reply({ content: 'Run `/setup <server_name>` first.', flags: MessageFlags.Ephemeral });
-    }
+    const server = await resolveServerOrReply(interaction);
+    if (!server) return;
     const timers = Timers.listByServer(server.id);
     return interaction.reply({ embeds: [statusEmbed(server, timers)] });
   },
