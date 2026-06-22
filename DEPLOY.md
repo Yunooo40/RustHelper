@@ -89,6 +89,18 @@ rustlink.test
 …which fires a test event at `POST /webhook/rust`. See [`plugin/README.md`](plugin/README.md)
 for the full plugin setup.
 
+### 7. (Optional) Verify the whole pipeline — no Rust server needed
+
+Fire every event type **and** a sample kill feed at the deployed API, then read the
+resulting timers/events back:
+
+```bash
+API_BASE=https://<app>.up.railway.app WEBHOOK_SECRET=<your-secret> npm run simulate
+```
+
+If the bot is running and you've `/setup` the same server name, the embeds show up in
+Discord. Locally it's just `npm run simulate` (defaults to `http://localhost:3000`).
+
 ---
 
 ## Environment variables reference

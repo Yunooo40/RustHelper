@@ -12,6 +12,7 @@
     "dev": "node --watch index.js",
     "api": "node index.js --api-only",
     "deploy-commands": "node deploy-commands.js",
+    "simulate": "node scripts/simulate.js",
     "test": "node --test"
   },
   "keywords": [

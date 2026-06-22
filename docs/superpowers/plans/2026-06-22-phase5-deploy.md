@@ -16,11 +16,16 @@ existants + un smoke-test réel du binding `PORT`.
 - [x] `DEPLOY.md` : guide pas-à-pas Railway (volume `/data`, env vars, commandes, plugin) +
       dépannage + section autres hôtes.
 - [x] `README` : roadmap → Phase 5, section « Deployment notes » pointant vers `DEPLOY.md`.
+- [x] `scripts/simulate.js` (+ `npm run simulate`) : smoke-test pipeline de bout en bout —
+      poste les 7 events + 4 morts au webhook, puis relit timers/events. `Connection: close`
+      + `process.exitCode` pour sortir proprement sous Windows (sinon assertion libuv undici).
 - [x] `npm test` → **51/51** (inchangé, défaut PORT=3000 préservé quand non défini).
 
 ## Vérif faite
-- **Smoke-test** : `PORT=4999 node index.js --api-only` (avec `.env` `API_PORT=3000`) →
+- **Smoke-test PORT** : `PORT=4999 node index.js --api-only` (avec `.env` `API_PORT=3000`) →
   l'app bind bien **4999** et `GET /health` renvoie `200 {"ok":true}`. Précédence PORT validée.
+- **Simulateur** : `npm run simulate` contre une API locale (DB `:memory:`, auth off) →
+  **14/14** requêtes OK, 7 timers + 7 events créés, code de sortie **0**.
 
 ## Vérif restante (action utilisateur — non bloquant)
 - Créer le projet Railway depuis le repo, monter le volume `/data`, poser les env vars,
