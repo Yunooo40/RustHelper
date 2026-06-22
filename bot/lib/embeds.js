@@ -100,3 +100,43 @@ export function deathEmbed({ serverName, victimName, victimDiscordId, killerName
   }
   return embed;
 }
+
+// K/D stats card for a single player (Phase 4.3).
+export function statsEmbed({ name, steamId, discordId, kills, deaths, kd, bestStreak, serverName }) {
+  const embed = new EmbedBuilder()
+    .setColor(COLOR)
+    .setTitle(`👤 ${name ?? steamId} — stats`)
+    .addFields(
+      { name: 'Kills', value: String(kills), inline: true },
+      { name: 'Deaths', value: String(deaths), inline: true },
+      { name: 'K/D', value: kd.toFixed(2), inline: true },
+      { name: 'Best streak', value: bestStreak > 0 ? `🔥 ${bestStreak}` : '—', inline: true },
+    )
+    .setFooter(serverName ? { text: `RustLink · ${serverName}` } : FOOTER)
+    .setTimestamp();
+
+  if (discordId) embed.setDescription(`<@${discordId}>`);
+  return embed;
+}
+
+// Server K/D leaderboard (Phase 4.3). `rows` come from Stats.leaderboard().
+const MEDALS = ['🥇', '🥈', '🥉'];
+export function leaderboardEmbed({ serverName, rows }) {
+  const embed = new EmbedBuilder()
+    .setColor(COLOR)
+    .setTitle(`🏆 K/D Leaderboard${serverName ? ` — ${serverName}` : ''}`)
+    .setFooter(FOOTER)
+    .setTimestamp();
+
+  embed.setDescription(
+    rows.length
+      ? rows
+          .map((p, i) => {
+            const rank = MEDALS[i] ?? `\`${i + 1}.\``;
+            return `${rank} **${p.name ?? p.steamId}** — \`${p.kd.toFixed(2)}\` K/D · ${p.kills}–${p.deaths}`;
+          })
+          .join('\n')
+      : 'No kills recorded yet. Stats appear as the kill feed fills up.',
+  );
+  return embed;
+}

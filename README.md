@@ -21,6 +21,8 @@ RustLink-style companion, built with **discord.js + Express + SQLite**.
 | `/events` | List upcoming events, soonest first |
 | `/player <username>` | Player info (stub — needs plugin, later phase) |
 | `/link` · `/unlink` | Link / unlink your Discord ↔ Rust (Steam) account |
+| `/stats [player]` | K/D stats for a linked player (yours by default) |
+| `/leaderboard` | Top players by K/D ratio |
 
 **REST API (backend)**
 | Method & Path | Description |
@@ -208,6 +210,8 @@ The Rust/Oxide plugin should `POST /webhook/rust` with:
   → **4.1** done: player linking — `/link` + in-game `!link <code>` ties Discord ↔ Steam
   → **4.2** done: death kill feed — opt-in plugin relay → `POST /webhook/death`, linked
     players shown as Discord mentions (`deaths` table, tested)
+  → **4.3** done: K/D stats & leaderboard — `/stats` + `/leaderboard` computed from the
+    `deaths` table (suicides/NPC handled, best streak, tested)
   → next: multi-server, PostgreSQL, deploy (Railway/Render/VPS)
 
 ---
