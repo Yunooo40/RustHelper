@@ -14,6 +14,11 @@
 //              → players announce events the plugin can't auto-detect (Oil Rig,
 //                Deep Sea…). Sent with source:"ingame" + reporter:<player>.
 //
+// Phase 4 — account linking:
+//   • !link <code>  (also /link <code>)
+//              → claims the code shown by the Discord /link command, tying the
+//                player's Steam id to their Discord account (POST /link/claim).
+//
 // Repo: https://github.com/Yunooo40/RustHelper
 //
 // IMPORTANT: Rust updates monthly and entity/hook names can drift. If an event
@@ -31,8 +36,8 @@ using Oxide.Core.Plugins;
 
 namespace Oxide.Plugins
 {
-    [Info("RustLink Relay", "Yunooo40", "0.2.0")]
-    [Description("Relays Rust events (auto + in-game reports/queries) to the RustLink Bot API.")]
+    [Info("RustLink Relay", "Yunooo40", "0.3.0")]
+    [Description("Relays Rust events (auto + in-game reports/queries/linking) to the RustLink Bot API.")]
     public class RustLinkRelay : RustPlugin
     {
         // ───────────────────────────── Configuration ─────────────────────────────
@@ -225,6 +230,13 @@ namespace Oxide.Plugins
         [Command("bradley")] private void CmdBradley(IPlayer p, string c, string[] a) => DoReport(p, "bradley");
         [Command("chinook")] private void CmdChinook(IPlayer p, string c, string[] a) => DoReport(p, "chinook");
 
+        [Command("link")]
+        private void CmdLink(IPlayer player, string command, string[] args)
+        {
+            if (args.Length == 0) { player.Reply("Usage: link <code>  (get the code from /link in Discord)"); return; }
+            DoLink(player, args[0]);
+        }
+
         // "!" style prefix → parsed from raw chat (the configurable RustLink convention).
         private object OnUserChat(IPlayer player, string message)
         {
@@ -239,6 +251,12 @@ namespace Oxide.Plugins
 
             string cmd = parts[0].ToLowerInvariant();
             if (cmd == "rl" || cmd == "timers" || cmd == "next") { DoQuery(player); return true; }
+            if (cmd == "link")
+            {
+                if (parts.Length < 2) player.Reply("Usage: " + prefix + "link <code>  (from /link in Discord)");
+                else DoLink(player, parts[1]);
+                return true;
+            }
             if (cmd == "report")
             {
                 if (parts.Length < 2) player.Reply("Usage: " + prefix + "report <event>");
@@ -321,6 +339,38 @@ namespace Oxide.Plugins
             PostEvent(key, "called", now, next, source: "ingame", reporter: player.Name);
             lastReport[player.Id] = DateTime.UtcNow;
             player.Reply($"Reported '{key}' to RustLink. Thanks!");
+        }
+
+        // ── Link: claim a /link code from in-game, tying this Steam id to a Discord user ──
+        private void DoLink(IPlayer player, string code)
+        {
+            if (!config.EnableChatCommands) return;
+
+            var payload = new Dictionary<string, object>
+            {
+                ["code"] = code,
+                ["steam_id"] = player.Id,   // covalence IPlayer.Id == SteamID64 on Rust
+                ["steam_name"] = player.Name,
+            };
+            string body = JsonConvert.SerializeObject(payload);
+            var headers = new Dictionary<string, string> { ["Content-Type"] = "application/json" };
+            if (!string.IsNullOrEmpty(config.WebhookSecret))
+                headers["x-webhook-secret"] = config.WebhookSecret;
+
+            webrequest.Enqueue(ApiBase() + "/link/claim", body, (httpCode, response) =>
+            {
+                if (httpCode >= 200 && httpCode < 300)
+                    player.Reply("RustLink: account linked! ✓");
+                else if (httpCode == 404)
+                    player.Reply("RustLink: invalid code. Run /link in Discord to get a fresh one.");
+                else if (httpCode == 410)
+                    player.Reply("RustLink: that code expired. Run /link in Discord for a new one.");
+                else
+                {
+                    player.Reply("RustLink: linking failed, try again later.");
+                    if (config.Debug) PrintWarning($"link/claim HTTP {httpCode}: {response}");
+                }
+            }, this, RequestMethod.POST, headers, config.TimeoutSeconds * 1000f);
         }
 
         private bool OnCooldown(IPlayer player)
