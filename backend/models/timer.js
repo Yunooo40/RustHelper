@@ -19,6 +19,14 @@ export function upsert({ serverId, eventType, expiresAt, status = null, source =
     .get(serverId, eventType);
 }
 
+// The single timer for a server + event type (or undefined). Used by in-game
+// queries (!cargo/!small/...) to answer with the current countdown.
+export function getByType(serverId, eventType) {
+  return db
+    .prepare('SELECT * FROM timers WHERE server_id = ? AND event_type = ?')
+    .get(serverId, eventType);
+}
+
 // All timers for a server, soonest first.
 export function listByServer(serverId) {
   return db

@@ -94,6 +94,15 @@ export class Connection {
   sendTeamMessageAsync(message) {
     return this.rp.sendRequestAsync({ sendTeamMessage: { message } }, config.rustplus.requestTimeoutMs);
   }
+
+  async getTeamInfoAsync() {
+    const res = await this.rp.sendRequestAsync({ getTeamInfo: {} }, config.rustplus.requestTimeoutMs);
+    return res.teamInfo;
+  }
+
+  promoteToLeaderAsync(steamId) {
+    return this.rp.sendRequestAsync({ promoteToLeader: { steamId } }, config.rustplus.requestTimeoutMs);
+  }
 }
 
 export default Connection;
