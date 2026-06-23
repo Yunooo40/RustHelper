@@ -6,8 +6,9 @@ RustLink-style companion, built with **discord.js + Express + SQLite**.
 
 > **Status:** Phases 1–6 done — Discord bot, API, SQLite, the Oxide/Carbon plugin,
 > in-game chat commands, player linking, K/D stats and multi-server tracking all work
-> end-to-end (68 tests green). Next: a live **Railway** deploy so a real Rust server can
-> reach the webhook (see [Deployment](DEPLOY.md) + [Roadmap](#-roadmap)).
+> end-to-end (76 tests green, `helmet` + per-IP rate limiting on the API). Next: a live
+> **Railway** deploy so a real Rust server can reach the webhook
+> (see [Deployment](DEPLOY.md) + [Roadmap](#-roadmap)).
 
 ---
 
@@ -36,7 +37,7 @@ RustLink-style companion, built with **discord.js + Express + SQLite**.
 | `POST /timers/set` | Manually create/refresh a timer |
 | `GET  /events?server=<name>` | Recent event history |
 | `GET  /servers` | List tracked servers |
-| `DELETE /servers/:name` | Admin: delete a server by name (+ cascade its events/timers/deaths) — needs the webhook secret |
+| `DELETE /servers/:name` | Admin: delete a server by name (+ cascade its events/timers/deaths) — needs the **admin** secret (`x-admin-secret`) |
 | `POST /link/claim` | Claim a link code from in-game (`!link <code>`) |
 | `GET  /link?discord=<id>` | Look up a Discord ↔ Steam link (also `?steam=`) |
 | `GET  /health` | Health check |
@@ -192,6 +193,8 @@ The Rust/Oxide plugin should `POST /webhook/rust` with:
 ```
 
 - `server` **must match** the name used in `/setup` (that's how notifications find the channel).
+  Because events route by name, a server name is **globally unique** — `/setup` rejects a
+  name already tracked by another Discord, so give each Rust server a distinct name.
 - `event` accepts the canonical keys or aliases (`small`, `large`, `deep`, `heli`, `cargo`, `ch47`).
 - `spawn_time` / `next_respawn` accept unix **seconds**, **milliseconds**, or an ISO string.
 - Send the secret in the `x-webhook-secret` header when `WEBHOOK_SECRET` is set.
@@ -231,7 +234,10 @@ The Rust/Oxide plugin should `POST /webhook/rust` with:
 
 **Full step-by-step guide: [`DEPLOY.md`](DEPLOY.md)** (Railway + SQLite on a volume).
 
-- Set `NODE_ENV=production` and a strong `WEBHOOK_SECRET`.
+- Set `NODE_ENV=production`, a strong `WEBHOOK_SECRET`, and a **separate** `ADMIN_SECRET`
+  (the latter guards `DELETE /servers/:name`, so it must differ from the plugin secret).
+- The API ships with `helmet` security headers and per-IP rate limiting
+  (`RATE_LIMIT_MAX` / `RATE_LIMIT_WINDOW_MS`, default 300 req/60s).
 - The app binds the host-injected `PORT` automatically; keep the SQLite file on a
   persistent volume (`DATABASE_PATH=/data/rustlink.sqlite`).
 - SQLite is fine to start; switch the `backend/models` layer to PostgreSQL when you

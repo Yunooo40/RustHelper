@@ -40,6 +40,19 @@ test('addServer: adopte une row orpheline (guild NULL) capturée par le webhook'
   assert.equal(Servers.listByGuild(G).length, 1);
 });
 
+test('addServer: refuse un nom déjà suivi par un AUTRE guild (routage webhook par nom)', () => {
+  Servers.addServer({ guildId: G, name: 'Atlas', channelId: 'c1' });
+  assert.throws(
+    () => Servers.addServer({ guildId: 'guild-2', name: 'atlas', channelId: 'c2' }),
+    (err) => err.code === 'SERVER_NAME_TAKEN',
+  );
+  // Le même guild peut toujours ré-ajouter / mettre à jour son propre serveur.
+  assert.doesNotThrow(() => Servers.addServer({ guildId: G, name: 'Atlas', channelId: 'c3' }));
+  // Et une row orpheline (guild NULL) reste adoptable, jamais bloquée.
+  Servers.findOrCreateByName('Nomad');
+  assert.doesNotThrow(() => Servers.addServer({ guildId: 'guild-3', name: 'Nomad' }));
+});
+
 test('listByGuild: défaut en premier, puis alphabétique', () => {
   Servers.addServer({ guildId: G, name: 'Zulu' }); // défaut (1er)
   Servers.addServer({ guildId: G, name: 'Alpha' });

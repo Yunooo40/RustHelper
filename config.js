@@ -22,6 +22,15 @@ export const config = {
     port: Number(env.PORT ?? env.API_PORT ?? 3000),
     // Shared secret expected from the Rust plugin. Empty = auth disabled (dev only).
     webhookSecret: env.WEBHOOK_SECRET ?? '',
+    // Separate secret for admin operations (e.g. DELETE /servers/:name). Kept apart
+    // from WEBHOOK_SECRET, which is handed to every Rust server operator. Empty = the
+    // admin endpoints are auth-disabled (dev only).
+    adminSecret: env.ADMIN_SECRET ?? '',
+    // Per-IP rate limiting (defence-in-depth on the public API). Disabled in tests.
+    rateLimit: {
+      windowMs: Number(env.RATE_LIMIT_WINDOW_MS ?? 60_000),
+      max: Number(env.RATE_LIMIT_MAX ?? 300),
+    },
   },
 
   db: {

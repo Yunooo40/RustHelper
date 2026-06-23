@@ -10,6 +10,7 @@ after(async () => { await server.close(); });
 beforeEach(() => {
   resetDb();
   config.api.webhookSecret = ''; // auth off par défaut ; les tests la mutent à chaud
+  config.api.adminSecret = ''; // DELETE est protégé par le secret ADMIN, pas le webhook
 });
 
 const req = (method, path, headers = {}) => fetch(server.url + path, { method, headers });
@@ -26,18 +27,27 @@ function seedServer(name) {
 }
 const count = (table, id) => db.prepare(`SELECT COUNT(*) n FROM ${table} WHERE server_id = ?`).get(id).n;
 
-test('DELETE /servers/:name — sans secret quand WEBHOOK_SECRET est set → 401, rien supprimé', async () => {
-  config.api.webhookSecret = 'shh';
+test('DELETE /servers/:name — sans secret quand ADMIN_SECRET est set → 401, rien supprimé', async () => {
+  config.api.adminSecret = 'shh';
   const id = seedServer('Bouzlouf');
   const res = await req('DELETE', '/servers/Bouzlouf');
   assert.equal(res.status, 401);
   assert.equal(db.prepare('SELECT COUNT(*) n FROM servers WHERE id = ?').get(id).n, 1);
 });
 
-test('DELETE /servers/:name — bon secret → 200 + supprime + cascade events/timers/deaths', async () => {
-  config.api.webhookSecret = 'shh';
+test('DELETE /servers/:name — le secret WEBHOOK ne suffit PAS (séparation des privilèges) → 401', async () => {
+  config.api.adminSecret = 'admin-shh';
+  config.api.webhookSecret = 'plugin-shh';
   const id = seedServer('Bouzlouf');
-  const res = await req('DELETE', '/servers/Bouzlouf', { 'x-webhook-secret': 'shh' });
+  const res = await req('DELETE', '/servers/Bouzlouf', { 'x-webhook-secret': 'plugin-shh' });
+  assert.equal(res.status, 401);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM servers WHERE id = ?').get(id).n, 1);
+});
+
+test('DELETE /servers/:name — bon secret admin → 200 + supprime + cascade events/timers/deaths', async () => {
+  config.api.adminSecret = 'shh';
+  const id = seedServer('Bouzlouf');
+  const res = await req('DELETE', '/servers/Bouzlouf', { 'x-admin-secret': 'shh' });
   assert.equal(res.status, 200);
   const body = await res.json();
   assert.deepEqual(body, { ok: true, removed: 1 });
@@ -48,8 +58,8 @@ test('DELETE /servers/:name — bon secret → 200 + supprime + cascade events/t
 });
 
 test('DELETE /servers/:name — nom absent → 404', async () => {
-  config.api.webhookSecret = 'shh';
-  const res = await req('DELETE', '/servers/Ghost', { 'x-webhook-secret': 'shh' });
+  config.api.adminSecret = 'shh';
+  const res = await req('DELETE', '/servers/Ghost', { 'x-admin-secret': 'shh' });
   assert.equal(res.status, 404);
   assert.equal((await res.json()).ok, false);
 });

@@ -29,7 +29,21 @@ export default {
 
     const name = interaction.options.getString('server_name', true);
     const channel = interaction.options.getChannel('channel') ?? interaction.channel;
-    const server = Servers.addServer({ guildId: interaction.guildId, name, channelId: channel.id });
+
+    let server;
+    try {
+      server = Servers.addServer({ guildId: interaction.guildId, name, channelId: channel.id });
+    } catch (err) {
+      if (err.code === 'SERVER_NAME_TAKEN') {
+        return interaction.reply({
+          content:
+            `⚠️ ${err.message}\nServer names must be unique because the webhook routes events by ` +
+            'name. Ask the Rust server to use a distinct name in its plugin config, then `/setup` again.',
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+      throw err;
+    }
     const isDefault = server.is_default === 1;
 
     const embed = new EmbedBuilder()
