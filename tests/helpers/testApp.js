@@ -4,6 +4,7 @@
 // modules backend, car config.js lit process.env une seule fois à l'import.
 // Les imports statiques ESM sont hoistés → on utilise import() dynamique APRÈS
 // avoir muté process.env.
+process.env.NODE_ENV = 'test'; // désactive le rate-limit (cf. backend/server.js)
 process.env.DATABASE_PATH = ':memory:';
 process.env.WEBHOOK_SECRET = ''; // auth désactivée par défaut ; les tests la mutent à chaud
 

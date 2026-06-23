@@ -54,8 +54,10 @@ Service → **Variables** → add:
 | `DISCORD_CLIENT_ID` | *your application ID*              | required |
 | `DISCORD_GUILD_ID`  | *(empty)*                          | empty = **global** commands; set one guild id for **instant** registration |
 | `WEBHOOK_SECRET`    | *a long random string*             | **must set in prod** — the plugin sends it as `x-webhook-secret` |
+| `ADMIN_SECRET`      | *a different long random string*   | **set in prod** — guards `DELETE /servers/:name` (`x-admin-secret`); keep it distinct from `WEBHOOK_SECRET` |
 | `DATABASE_PATH`     | `/data/rustlink.sqlite`            | points SQLite at the mounted volume |
 | `NODE_ENV`          | `production`                       | |
+| `RATE_LIMIT_MAX` / `RATE_LIMIT_WINDOW_MS` | *(optional)*         | per-IP rate limit; defaults to 300 req / 60s |
 
 > **Do not set `PORT`** — Railway injects it and the app reads it automatically
 > (verified: it overrides `API_PORT`).

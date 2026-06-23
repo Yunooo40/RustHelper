@@ -69,6 +69,23 @@ export function list() {
 // FIRST server becomes its default. If a NULL-guild "orphan" row of the same name
 // exists (captured by the webhook before /setup), adopt it instead of duplicating.
 export function addServer({ guildId, name, channelId = null }) {
+  // Webhooks route by name only (findByName), so a given name must map to a single
+  // guild — otherwise events for "Rust EU 2x" could land in the wrong Discord. Reject
+  // a name already tracked by a DIFFERENT guild. (Orphan rows have guild_id NULL and
+  // are adopted below, not blocked; re-adding within the same guild is an update.)
+  const conflict = db
+    .prepare(
+      `SELECT guild_id FROM servers
+        WHERE name = ? COLLATE NOCASE AND guild_id IS NOT NULL AND guild_id <> ?
+        LIMIT 1`,
+    )
+    .get(name, guildId);
+  if (conflict) {
+    const err = new Error(`The server name "${name}" is already tracked by another Discord.`);
+    err.code = 'SERVER_NAME_TAKEN';
+    throw err;
+  }
+
   const existing = findByGuildName(guildId, name);
   if (existing) {
     db.prepare(`UPDATE servers SET channel_id = ?, updated_at = datetime('now') WHERE id = ?`).run(

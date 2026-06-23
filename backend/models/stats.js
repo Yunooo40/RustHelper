@@ -19,6 +19,24 @@ export function kd(kills, deaths) {
   return deaths > 0 ? kills / deaths : kills;
 }
 
+// Most recent display name + linked Discord id seen for a player (as killer or
+// victim). `serverId` optional → all servers.
+function latestIdentity({ steamId, serverId = null }) {
+  const scope = serverId ? 'AND server_id = @serverId' : '';
+  const row = db
+    .prepare(
+      `SELECT name, discord_id FROM (
+         SELECT id, killer_name AS name, killer_discord_id AS discord_id
+           FROM deaths WHERE killer_id = @steamId ${scope}
+         UNION ALL
+         SELECT id, victim_name AS name, victim_discord_id AS discord_id
+           FROM deaths WHERE victim_id = @steamId ${scope}
+       ) ORDER BY id DESC LIMIT 1`,
+    )
+    .get({ steamId, serverId });
+  return { name: row?.name ?? null, discordId: row?.discord_id ?? null };
+}
+
 // Stats for a single player (by Steam id). `serverId` optional → all servers.
 export function forPlayer({ steamId, serverId = null }) {
   if (!steamId) return null;
@@ -37,23 +55,12 @@ export function forPlayer({ steamId, serverId = null }) {
     .prepare(`SELECT COUNT(*) AS n FROM deaths WHERE victim_id = @steamId ${scope}`)
     .get(params).n;
 
-  // Most recent display name we've seen for this player (killer or victim).
-  const nameRow = db
-    .prepare(
-      `SELECT name, discord_id FROM (
-         SELECT id, killer_name AS name, killer_discord_id AS discord_id
-           FROM deaths WHERE killer_id = @steamId ${scope}
-         UNION ALL
-         SELECT id, victim_name AS name, victim_discord_id AS discord_id
-           FROM deaths WHERE victim_id = @steamId ${scope}
-       ) ORDER BY id DESC LIMIT 1`,
-    )
-    .get(params);
+  const { name, discordId } = latestIdentity({ steamId, serverId });
 
   return {
     steamId,
-    name: nameRow?.name ?? null,
-    discordId: nameRow?.discord_id ?? null,
+    name,
+    discordId,
     kills,
     deaths,
     kd: kd(kills, deaths),
@@ -87,41 +94,46 @@ function bestStreakFor({ steamId, serverId = null }) {
 
 // Server leaderboard, ranked by K/D (then kills). `serverId` optional → all servers.
 // `minKills` filters out tiny sample sizes from the ranking.
+//
+// Counts are aggregated in SQL (GROUP BY) so we never load the whole `deaths` table
+// into memory — the result set is one row per ranked player, not one per death. The
+// (small) top-N rows are then decorated with each player's latest name/Discord id.
 export function leaderboard({ serverId = null, limit = 10, minKills = 0 } = {}) {
-  const scope = serverId ? 'WHERE server_id = @serverId' : '';
+  const scope = serverId ? 'AND server_id = @serverId' : '';
   const rows = db
     .prepare(
-      `SELECT killer_id, killer_name, killer_discord_id,
-              victim_id, victim_name, victim_discord_id
-         FROM deaths ${scope} ORDER BY id ASC`,
+      `WITH k AS (
+         SELECT killer_id AS sid, COUNT(*) AS kills
+           FROM deaths
+          WHERE killer_id IS NOT NULL
+            AND (victim_id IS NULL OR victim_id <> killer_id) ${scope}
+          GROUP BY killer_id
+       ),
+       d AS (
+         SELECT victim_id AS sid, COUNT(*) AS deaths
+           FROM deaths
+          WHERE victim_id IS NOT NULL ${scope}
+          GROUP BY victim_id
+       ),
+       ids AS (SELECT sid FROM k UNION SELECT sid FROM d)
+       SELECT ids.sid                  AS steamId,
+              COALESCE(k.kills, 0)     AS kills,
+              COALESCE(d.deaths, 0)    AS deaths
+         FROM ids
+         LEFT JOIN k ON k.sid = ids.sid
+         LEFT JOIN d ON d.sid = ids.sid
+        WHERE COALESCE(k.kills, 0) >= @minKills
+        ORDER BY (CASE WHEN COALESCE(d.deaths, 0) > 0
+                       THEN CAST(COALESCE(k.kills, 0) AS REAL) / d.deaths
+                       ELSE COALESCE(k.kills, 0) END) DESC,
+                 kills DESC
+        LIMIT @limit`,
     )
-    .all({ serverId });
+    .all({ serverId, minKills, limit });
 
-  // Aggregate per Steam id in chronological order so the last name/discord wins.
-  const players = new Map();
-  const touch = (id) => {
-    if (!players.has(id)) players.set(id, { steamId: id, name: null, discordId: null, kills: 0, deaths: 0 });
-    return players.get(id);
-  };
-
-  for (const r of rows) {
-    if (r.victim_id) {
-      const p = touch(r.victim_id);
-      p.deaths += 1;
-      if (r.victim_name) p.name = r.victim_name;
-      if (r.victim_discord_id) p.discordId = r.victim_discord_id;
-    }
-    if (r.killer_id && r.killer_id !== r.victim_id) {
-      const p = touch(r.killer_id);
-      p.kills += 1;
-      if (r.killer_name) p.name = r.killer_name;
-      if (r.killer_discord_id) p.discordId = r.killer_discord_id;
-    }
-  }
-
-  return [...players.values()]
-    .map((p) => ({ ...p, kd: kd(p.kills, p.deaths) }))
-    .filter((p) => p.kills >= minKills)
-    .sort((a, b) => b.kd - a.kd || b.kills - a.kills)
-    .slice(0, limit);
+  return rows.map((p) => ({
+    ...p,
+    kd: kd(p.kills, p.deaths),
+    ...latestIdentity({ steamId: p.steamId, serverId }),
+  }));
 }

@@ -1,6 +1,6 @@
 // IMPORTANT: testApp.js must be imported first — it sets DATABASE_PATH=:memory:
 // before any backend module loads config.
-import { db, resetDb } from '../helpers/testApp.js';
+import { resetDb } from '../helpers/testApp.js';
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import * as Stats from '../../backend/models/stats.js';

@@ -6,8 +6,10 @@
 import { config } from './config.js';
 import { createApiServer } from './backend/server.js';
 import { createBot } from './bot/bot.js';
+import * as Link from './backend/models/link.js';
 
 const apiOnly = process.argv.includes('--api-only');
+const PURGE_INTERVAL_MS = 10 * 60 * 1000; // drop expired link codes every 10 min
 
 async function main() {
   // 1) Start the API.
@@ -15,6 +17,17 @@ async function main() {
   const httpServer = app.listen(config.api.port, () => {
     console.log(`[api] listening on http://localhost:${config.api.port}`);
   });
+
+  // Housekeeping: periodically purge expired pending link codes. unref() so the
+  // timer never keeps the process alive on its own.
+  const purgeTimer = setInterval(() => {
+    try {
+      Link.purgeExpired();
+    } catch (err) {
+      console.error('[app] link code purge failed:', err);
+    }
+  }, PURGE_INTERVAL_MS);
+  purgeTimer.unref();
 
   // 2) Start the bot (optional — needs a token).
   let client = null;
@@ -27,12 +40,21 @@ async function main() {
     await client.login(config.discord.token);
   }
 
-  // 3) Graceful shutdown.
+  // 3) Graceful shutdown: stop accepting connections and wait for in-flight requests
+  // to drain before exiting (with a hard 10s fallback so we never hang).
+  let shuttingDown = false;
   const shutdown = (signal) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
     console.log(`\n[app] ${signal} received, shutting down...`);
-    httpServer.close();
+    clearInterval(purgeTimer);
     if (client) client.destroy();
-    process.exit(0);
+    const hard = setTimeout(() => process.exit(0), 10_000);
+    hard.unref();
+    httpServer.close(() => {
+      clearTimeout(hard);
+      process.exit(0);
+    });
   };
   process.on('SIGINT', () => shutdown('SIGINT'));
   process.on('SIGTERM', () => shutdown('SIGTERM'));
