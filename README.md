@@ -4,11 +4,13 @@ A Discord bot + REST API that tracks **Rust** in-game events — Oil Rig crates,
 Helicopter, Cargo Ship, and more — and posts live timers/notifications to your Discord.
 RustLink-style companion, built with **discord.js + Express + SQLite**.
 
-> **Status:** Phases 1–6 done — Discord bot, API, SQLite, the Oxide/Carbon plugin,
-> in-game chat commands, player linking, K/D stats and multi-server tracking all work
-> end-to-end (76 tests green, `helmet` + per-IP rate limiting on the API). Next: a live
-> **Railway** deploy so a real Rust server can reach the webhook
-> (see [Deployment](DEPLOY.md) + [Roadmap](#-roadmap)).
+> **Status:** Phases 1–7 done — Discord bot, API, SQLite, the Oxide/Carbon plugin,
+> in-game chat commands, player linking, K/D stats, multi-server tracking, a live
+> **Railway** deploy, and now a **Rust+ companion** socket: pair any server with `/pair`,
+> then in-game **`!pop` / `!time`** reply in team chat and **`/pop` `/time`** mirror them on
+> Discord (103 tests green, `helmet` + per-IP rate limiting). Rust+ works on *any* server
+> without admin — pending a live pairing test. Next: more in-game commands + smart
+> switches/alarms/storage over Rust+ (see [Deployment](DEPLOY.md) + [Roadmap](#-roadmap)).
 
 ---
 
@@ -226,6 +228,12 @@ The Rust/Oxide plugin should `POST /webhook/rust` with:
   `/setup` adds servers (first = default), `/servers` lists them, `/server-default` &
   `/server-remove` manage them, and `/status` `/events` `/timer` take an optional
   `server:` argument (idempotent schema migration, model + commands tested)
+- [x] **Phase 7 — Rust+ companion (socket foundation):** talk to **any** server via the
+  official **Rust+** protocol (`@liamcottle/rustplus.js`) — no admin needed. `/pair` stores
+  credentials, a reconnecting manager opens one socket per server, in-game **`!pop` / `!time`**
+  reply in team chat, and **`/pop` `/time`** mirror them on Discord (model + route + in-game
+  router unit-tested; live connect validated at pairing) — ⚠️ pending a live pairing test
+  → next (P8+): more in-game commands, smart switches, alarms, storage monitors, map
   → later: PostgreSQL migration, per-user DM opt-in, per-server stats
 
 ---

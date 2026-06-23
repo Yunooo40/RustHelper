@@ -10,6 +10,7 @@ import { timersRouter } from './routes/timers.js';
 import { eventsRouter } from './routes/events.js';
 import { serversRouter } from './routes/servers.js';
 import { linkRouter } from './routes/link.js';
+import { pairRouter } from './routes/pair.js';
 
 export function createApiServer() {
   const app = express();
@@ -60,6 +61,7 @@ export function createApiServer() {
         'GET  /servers',
         'POST /link/claim',
         'GET  /link?discord=<id>|steam=<id>',
+        'POST /pair  (admin)',
       ],
     }),
   );
@@ -72,6 +74,7 @@ export function createApiServer() {
   app.use('/events', eventsRouter());
   app.use('/servers', serversRouter());
   app.use('/link', linkRouter());
+  app.use('/pair', pairRouter());
 
   // 404 + error handlers (kept last).
   app.use((_req, res) => res.status(404).json({ ok: false, error: 'Not found' }));

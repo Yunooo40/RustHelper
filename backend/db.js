@@ -137,6 +137,25 @@ db.exec(`
     created_at        TEXT NOT NULL DEFAULT (datetime('now'))
   );
   CREATE INDEX IF NOT EXISTS idx_deaths_server ON deaths(server_id, created_at);
+
+  -- Rust+ companion pairings (Phase 7): credentials to open a RustPlus websocket for a
+  -- tracked server. One row per (server, player whose token we connect with). is_active
+  -- marks the pairing the manager actually connects with. player_token is a SECRET — it
+  -- grants companion control of that player on that server; never log it.
+  CREATE TABLE IF NOT EXISTS rustplus_pairings (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    server_id    INTEGER NOT NULL REFERENCES servers(id) ON DELETE CASCADE,
+    server_ip    TEXT NOT NULL,
+    app_port     INTEGER NOT NULL,
+    steam_id     TEXT NOT NULL,                 -- player id we connect as
+    player_token TEXT NOT NULL,                 -- secret
+    is_active    INTEGER NOT NULL DEFAULT 1,
+    label        TEXT,                          -- optional, e.g. who paired
+    created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at   TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(server_id, steam_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_pairings_active ON rustplus_pairings(is_active);
 `);
 
 export default db;

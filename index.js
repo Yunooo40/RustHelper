@@ -7,6 +7,7 @@ import { config } from './config.js';
 import { createApiServer } from './backend/server.js';
 import { createBot } from './bot/bot.js';
 import * as Link from './backend/models/link.js';
+import { startManager, stopManager } from './rustplus/manager.js';
 
 const apiOnly = process.argv.includes('--api-only');
 const PURGE_INTERVAL_MS = 10 * 60 * 1000; // drop expired link codes every 10 min
@@ -40,6 +41,12 @@ async function main() {
     await client.login(config.discord.token);
   }
 
+  // 2b) Start the Rust+ companion manager (in-game ! commands + /pop /time). No-op until
+  // a server is paired (/pair). Skipped in --api-only (curl/testing) mode.
+  if (!apiOnly) {
+    startManager();
+  }
+
   // 3) Graceful shutdown: stop accepting connections and wait for in-flight requests
   // to drain before exiting (with a hard 10s fallback so we never hang).
   let shuttingDown = false;
@@ -48,6 +55,7 @@ async function main() {
     shuttingDown = true;
     console.log(`\n[app] ${signal} received, shutting down...`);
     clearInterval(purgeTimer);
+    stopManager();
     if (client) client.destroy();
     const hard = setTimeout(() => process.exit(0), 10_000);
     hard.unref();
