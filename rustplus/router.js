@@ -8,6 +8,10 @@
 // The `client` is the promisified connection (rustplus/connection.js): it exposes
 // getInfoAsync(), getTimeAsync(), sendTeamMessageAsync(text). Kept as an injected
 // dependency so this whole module is unit-testable with a fake client (no live socket).
+import { formatOnline, formatOffline, formatAlive, formatProx } from './teamFormat.js';
+import * as Timers from '../backend/models/timer.js';
+import { resolveEvent, eventEmoji, eventLabel } from '../shared/events.js';
+import { nowUnix, formatCountdown } from '../shared/time.js';
 
 // ── Reply formatters (pure — unit-tested directly) ──────────────────────────────
 
@@ -24,19 +28,62 @@ export function formatTime(time) {
   return `🕑 Il est ${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} en jeu`;
 }
 
+// Promote the caller (no arg) or the named member to team leader.
+async function handleLeader(client, msg, args) {
+  if (!args) {
+    await client.promoteToLeaderAsync(msg.steamId);
+    return client.sendTeamMessageAsync(`👑 ${msg.name} est promu chef`);
+  }
+  const info = await client.getTeamInfoAsync();
+  const target = (info?.members ?? []).find(
+    (m) => (m.name ?? '').toLowerCase() === args.toLowerCase(),
+  );
+  if (!target) return client.sendTeamMessageAsync(`❌ Joueur « ${args} » introuvable`);
+  await client.promoteToLeaderAsync(target.steamId);
+  return client.sendTeamMessageAsync(`👑 ${target.name} est promu chef`);
+}
+
+// Answer with the active timer for an event (or "aucun timer actif"). serverId
+// comes from the connection (client.serverId) so we read the right server's timers.
+function eventHandler(alias) {
+  return async (client) => {
+    const key = resolveEvent(alias);
+    const label = `${eventEmoji(key)} ${eventLabel(key)}`;
+    const timer = key ? Timers.getByType(client.serverId, key) : null;
+    if (!timer || timer.expires_at <= nowUnix()) {
+      return client.sendTeamMessageAsync(`${label} — aucun timer actif`);
+    }
+    return client.sendTeamMessageAsync(`${label} — dans ${formatCountdown(timer.expires_at)}`);
+  };
+}
+
 // ── Dispatch table ──────────────────────────────────────────────────────────────
+// Handlers receive (client, msg, args): `msg` is the AppTeamMessage, `args` the text
+// after the command token. Pull-only — each replies via sendTeamMessageAsync.
 
 const COMMANDS = {
   '!pop': async (client) => client.sendTeamMessageAsync(formatPop(await client.getInfoAsync())),
   '!time': async (client) => client.sendTeamMessageAsync(formatTime(await client.getTimeAsync())),
+  '!online': async (client) => client.sendTeamMessageAsync(formatOnline(await client.getTeamInfoAsync())),
+  '!offline': async (client) => client.sendTeamMessageAsync(formatOffline(await client.getTeamInfoAsync())),
+  '!alive': async (client) => client.sendTeamMessageAsync(formatAlive(await client.getTeamInfoAsync())),
+  '!prox': async (client, msg) => client.sendTeamMessageAsync(formatProx(await client.getTeamInfoAsync(), msg.steamId)),
+  '!bot': async (client, msg, args) => client.sendTeamMessageAsync(args || 'Usage : !bot <message>'),
+  '!leader': handleLeader,
 };
+COMMANDS['!proximity'] = COMMANDS['!prox']; // alias
+for (const alias of ['cargo', 'small', 'large', 'heli']) {
+  COMMANDS[`!${alias}`] = eventHandler(alias);
+}
 
-// Parse the leading token, lowercased. "!POP extra" -> "!pop". Non-command -> null.
+// Parse a "!" command: { cmd, args } with cmd lowercased and args = text after the
+// first token (trimmed). "!Leader Bob" -> { cmd:'!leader', args:'Bob' }. Non-command -> null.
 export function parseCommand(text) {
   if (typeof text !== 'string') return null;
   const trimmed = text.trim();
   if (!trimmed.startsWith('!')) return null;
-  return trimmed.split(/\s+/)[0].toLowerCase();
+  const token = trimmed.split(/\s+/)[0];
+  return { cmd: token.toLowerCase(), args: trimmed.slice(token.length).trim() };
 }
 
 // Handle one incoming team-chat broadcast (= AppMessage.broadcast.teamMessage).
@@ -46,12 +93,12 @@ export async function handleTeamMessage(teamMessage, client, selfSteamId) {
   const msg = teamMessage?.message; // AppTeamMessage: { steamId, name, message, color }
   if (!msg || typeof msg.message !== 'string') return null;
   if (selfSteamId && String(msg.steamId) === String(selfSteamId)) return null; // ignore our own echo
-  const cmd = parseCommand(msg.message);
-  if (!cmd) return null;
-  const handler = COMMANDS[cmd];
+  const parsed = parseCommand(msg.message);
+  if (!parsed) return null;
+  const handler = COMMANDS[parsed.cmd];
   if (!handler) return null;
-  await handler(client, msg);
-  return cmd;
+  await handler(client, msg, parsed.args);
+  return parsed.cmd;
 }
 
 // Exposed so Phase 8 can extend the table and tests can introspect it.
