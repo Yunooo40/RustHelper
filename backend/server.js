@@ -14,6 +14,13 @@ import { linkRouter } from './routes/link.js';
 export function createApiServer() {
   const app = express();
 
+  // Railway/Render (and most PaaS) terminate TLS at a reverse proxy and forward the
+  // real client IP in X-Forwarded-For. Trust exactly ONE hop so express-rate-limit
+  // keys on the actual client IP rather than the proxy's — otherwise every request
+  // shares one bucket and the limit becomes global. `1` (not `true`) prevents clients
+  // from spoofing X-Forwarded-For to dodge the limit.
+  app.set('trust proxy', 1);
+
   // Security headers + JSON body cap (the plugin payloads are tiny).
   app.use(helmet());
   app.use(express.json({ limit: '64kb' }));
