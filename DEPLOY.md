@@ -103,6 +103,26 @@ API_BASE=https://<app>.up.railway.app WEBHOOK_SECRET=<your-secret> npm run simul
 If the bot is running and you've `/setup` the same server name, the embeds show up in
 Discord. Locally it's just `npm run simulate` (defaults to `http://localhost:3000`).
 
+### 8. (Optional) Pair a server with Rust+ (Phase 7)
+
+The **Rust+ companion** socket works on **any** server you play on — official or
+community — **without admin**. It powers in-game `!pop` / `!time` and the `/pop` `/time`
+Discord commands. To pair, run **on your machine** (not the server):
+
+```bash
+npx @liamcottle/rustplus.js fcm-register   # Steam login, once — generates FCM creds
+npx @liamcottle/rustplus.js fcm-listen     # then click "Pair" in-game (Rust+ menu)
+```
+
+`fcm-listen` prints the server's `serverIp`, `appPort`, `playerId` (your steam id) and
+`playerToken`. Feed them to the bot with **`/pair`** (admin-only) after
+`/setup`-ting that server. The manager connects within a few seconds — verify with `/pop`.
+
+- The `playerToken` is a **secret** (companion control of your player) — never share it;
+  re-run `/pair` to refresh it if it rotates. `/unpair <server>` removes it.
+- Kill-switch: set `RUSTPLUS_ENABLED=false` to disable the socket manager entirely.
+- No pairing = no-op: the manager stays idle, so this changes nothing until you opt in.
+
 ---
 
 ## Environment variables reference

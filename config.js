@@ -37,6 +37,19 @@ export const config = {
     // ":memory:" et "" sont des modes SQLite spéciaux : ne pas les résoudre en chemin.
     path: rawDbPath === ':memory:' || rawDbPath === '' ? ':memory:' : path.resolve(rawDbPath),
   },
+
+  rustplus: {
+    // Companion Rust+ socket manager (Phase 7). On by default; it's a no-op until a
+    // pairing exists. Set RUSTPLUS_ENABLED="false" as a kill-switch. Credentials
+    // (ip/port/steamId/playerToken) live in the DB (rustplus_pairings), never in env.
+    enabled: env.RUSTPLUS_ENABLED !== 'false',
+    reconnect: {
+      minDelayMs: Number(env.RUSTPLUS_RECONNECT_MIN_MS ?? 2_000),
+      maxDelayMs: Number(env.RUSTPLUS_RECONNECT_MAX_MS ?? 60_000),
+    },
+    // Safety timeout for a single Rust+ request (getInfo/getTime/...) before we reject.
+    requestTimeoutMs: Number(env.RUSTPLUS_REQUEST_TIMEOUT_MS ?? 10_000),
+  },
 };
 
 export const isProd = config.env === 'production';

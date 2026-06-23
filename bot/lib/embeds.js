@@ -141,6 +141,42 @@ export function leaderboardEmbed({ serverName, rows }) {
   return embed;
 }
 
+// Live population (Phase 7, Rust+). `info` is the AppInfo returned by getInfo().
+export function popEmbed(server, info) {
+  const queued = info.queuedPlayers ? ` · ${info.queuedPlayers} queued` : '';
+  return new EmbedBuilder()
+    .setColor(COLOR)
+    .setTitle(`👥 Population — ${server?.name ?? 'server'}`)
+    .setDescription(`**${info.players}/${info.maxPlayers}** online${queued}`)
+    .setFooter(FOOTER)
+    .setTimestamp();
+}
+
+// Rust in-game time as HH:MM (the AppTime float is hours in [0, 24)).
+function hhmm(t) {
+  const v = Number(t) || 0;
+  const h = Math.floor(v);
+  const m = Math.floor((v - h) * 60);
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+// Live in-game time (Phase 7, Rust+). `time` is the AppTime from getTime().
+export function timeEmbed(server, time) {
+  const embed = new EmbedBuilder()
+    .setColor(COLOR)
+    .setTitle(`🕑 In-game time — ${server?.name ?? 'server'}`)
+    .setDescription(`**${hhmm(time.time)}**`)
+    .setFooter(FOOTER)
+    .setTimestamp();
+  if (time.sunrise != null && time.sunset != null) {
+    embed.addFields(
+      { name: 'Sunrise', value: hhmm(time.sunrise), inline: true },
+      { name: 'Sunset', value: hhmm(time.sunset), inline: true },
+    );
+  }
+  return embed;
+}
+
 // List of the Rust servers a guild tracks (Phase 6). ⭐ marks the default.
 export function serverListEmbed(servers) {
   const lines = servers.map((s) => {
