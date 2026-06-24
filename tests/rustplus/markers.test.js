@@ -1,7 +1,7 @@
 // Unit tests for the Rust+ map-marker diff — pure logic, no socket, no DB.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { diffMarkers, MARKER_EVENT } from '../../rustplus/markers.js';
+import { diffMarkers, oilRigsFromMap, MARKER_EVENT } from '../../rustplus/markers.js';
 
 // AppMarker types: 2=Explosion, 4=CH47, 5=CargoShip, 8=PatrolHelicopter; 1=Player, 3=Vending.
 const cargo = (id) => ({ id, type: 5, x: 1, y: 2 });
@@ -81,4 +81,54 @@ test('événements simultanés : un heli part (sans boom) et un cargo arrive', (
 
 test('MARKER_EVENT mappe les 3 types spawn/left vers les clés canoniques', () => {
   assert.deepEqual(MARKER_EVENT, { 4: 'chinook', 5: 'cargo', 8: 'helicopter' });
+});
+
+// ── Phase 8.4 — caisses verrouillées sur les Oil Rigs ────────────────────────────
+
+const crate = (id, x, y) => ({ id, type: 6, x, y });
+const MAP = {
+  monuments: [
+    { token: 'oil_rig_small', x: 1000, y: 2000 },
+    { token: 'large_oil_rig', x: 5000, y: 6000 }, // ordre/format de token différents exprès
+    { token: 'harbor_1', x: 100, y: 100 },
+  ],
+};
+const RIGS = oilRigsFromMap(MAP);
+
+test('oilRigsFromMap : extrait petit + grand rig (matching tolérant), ignore le reste', () => {
+  assert.deepEqual(RIGS, [
+    { eventType: 'oil_rig_small', x: 1000, y: 2000, token: 'oil_rig_small' },
+    { eventType: 'oil_rig_large', x: 5000, y: 6000, token: 'large_oil_rig' },
+  ]);
+});
+
+test('oilRigsFromMap : carte vide / nulle → []', () => {
+  assert.deepEqual(oilRigsFromMap(null), []);
+  assert.deepEqual(oilRigsFromMap({ monuments: [] }), []);
+});
+
+test('caisse qui apparaît SUR le petit rig (≤100m) → oil_rig_small:spawned', () => {
+  const events = diffMarkers([], [crate(1, 1010, 2010)], RIGS); // ~14m du petit rig
+  assert.deepEqual(labels(events), ['oil_rig_small:spawned']);
+});
+
+test('caisse sur le grand rig → oil_rig_large:spawned', () => {
+  assert.deepEqual(labels(diffMarkers([], [crate(2, 5005, 5995)], RIGS)), ['oil_rig_large:spawned']);
+});
+
+test('caisse loin de tout rig (cargo / largage CH47) → ignorée', () => {
+  assert.deepEqual(diffMarkers([], [crate(3, 9000, 9000)], RIGS), []);
+});
+
+test('caisse mais aucun rig connu (getMap pas encore chargé) → ignorée', () => {
+  assert.deepEqual(diffMarkers([], [crate(1, 1010, 2010)]), []); // oilRigs défaut = []
+});
+
+test('caisse qui disparaît (lootée) → aucun event (annonce à l’apparition seulement)', () => {
+  assert.deepEqual(diffMarkers([crate(1, 1010, 2010)], [], RIGS), []);
+});
+
+test('caisse déjà présente d’un poll à l’autre → aucun event', () => {
+  const snap = [crate(1, 1010, 2010)];
+  assert.deepEqual(diffMarkers(snap, snap, RIGS), []);
 });

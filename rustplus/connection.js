@@ -10,7 +10,7 @@
 import RustPlus from '@liamcottle/rustplus.js';
 import { config } from '../config.js';
 import { handleTeamMessage } from './router.js';
-import { diffMarkers } from './markers.js';
+import { diffMarkers, oilRigsFromMap } from './markers.js';
 import * as Servers from '../backend/models/server.js';
 import { recordRustEvent } from '../backend/ingest.js';
 
@@ -24,10 +24,11 @@ export class Connection {
     this.stopped = false;
     this.reconnectDelay = config.rustplus.reconnect.minDelayMs;
     this.reconnectTimer = null;
-    // Map-marker poller (live Cargo/Heli/Chinook detection, no plugin).
+    // Map-marker poller (live Cargo/Heli/Chinook/Bradley + Oil Rig detection, no plugin).
     this.markers = [];        // last getMapMarkers snapshot, for diffing
     this.markersSeeded = false; // first poll after (re)connect only seeds — see _pollMarkers
     this.pollTimer = null;
+    this.oilRigs = [];        // oil rig monument positions (from getMap), to place crate markers
   }
 
   start() {
@@ -45,6 +46,7 @@ export class Connection {
       this.reconnectDelay = config.rustplus.reconnect.minDelayMs; // reset backoff on success
       console.log(`[rustplus] connected (server #${this.serverId} ${p.server_ip}:${p.app_port})`);
       this._startPolling();
+      this._loadOilRigs(); // best-effort; crates stay unattributed until it lands
     });
 
     rp.on('message', (msg) => {
@@ -88,12 +90,12 @@ export class Connection {
     this.connected = false;
   }
 
-  // ── Map-marker poller (Phase 8.2/8.3) ──────────────────────────────────────────
-  // Poll getMapMarkers and diff snapshots to announce Cargo/Heli/Chinook spawns and
-  // Heli/Bradley destructions live, with no Oxide plugin. Started on 'connected', stopped
-  // on 'disconnected'/stop(). The first
-  // poll after every (re)connect only SEEDS state — so we never re-announce an event
-  // that was already happening before we connected (or across a brief reconnect).
+  // ── Map-marker poller (Phase 8.2/8.3/8.4) ──────────────────────────────────────
+  // Poll getMapMarkers and diff snapshots to announce Cargo/Heli/Chinook spawns, Heli/Bradley
+  // destructions, and Oil Rig crate spawns live, with no Oxide plugin. Started on 'connected',
+  // stopped on 'disconnected'/stop(). The first poll after every (re)connect only SEEDS state
+  // — so we never re-announce an event already happening before we connected (or across a
+  // brief reconnect).
   _startPolling() {
     if (!config.rustplus.markers.enabled || this.pollTimer) return;
     this.markers = [];
@@ -122,13 +124,27 @@ export class Connection {
       this.markersSeeded = true;
       return;
     }
-    const events = diffMarkers(this.markers, markers);
+    const events = diffMarkers(this.markers, markers, this.oilRigs);
     this.markers = markers;
     if (!events.length) return;
 
     const server = Servers.findById(this.serverId);
     if (!server) return; // server row deleted (unpaired/removed) — nothing to notify
     for (const { eventType, status, marker } of events) this._announce(server, eventType, status, marker);
+  }
+
+  // Fetch the static map once per connect and cache the oil rig monument positions, so the
+  // diff can attribute locked-crate spawns to the Small/Large Oil Rig. Best-effort: on
+  // failure oilRigs stays empty and crate markers are simply ignored (no crash).
+  async _loadOilRigs() {
+    try {
+      this.oilRigs = oilRigsFromMap(await this.getMapAsync());
+      if (this.oilRigs.length) {
+        console.log(`[rustplus] mapped ${this.oilRigs.length} oil rig(s) (server #${this.serverId})`);
+      }
+    } catch (err) {
+      console.error(`[rustplus] getMap failed (server #${this.serverId}):`, err?.message ?? err);
+    }
   }
 
   _announce(server, eventType, status, marker) {
@@ -167,6 +183,11 @@ export class Connection {
   async getMapMarkersAsync() {
     const res = await this.rp.sendRequestAsync({ getMapMarkers: {} }, config.rustplus.requestTimeoutMs);
     return res.mapMarkers?.markers ?? [];
+  }
+
+  async getMapAsync() {
+    const res = await this.rp.sendRequestAsync({ getMap: {} }, config.rustplus.requestTimeoutMs);
+    return res.map;
   }
 
   promoteToLeaderAsync(steamId) {

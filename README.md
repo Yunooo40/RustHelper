@@ -246,6 +246,11 @@ The Rust/Oxide plugin should `POST /webhook/rust` with:
   **`helicopter destroyed`** / **`bradley destroyed`**. Heli-vs-Bradley is inferred by pairing
   an explosion with a heli marker vanishing the same poll (and the duplicate "heli left" is
   suppressed). Heuristic — to confirm on a live server
+- [x] **Phase 8.4 — Oil Rig locked crates (map + crate markers):** on connect the companion
+  fetches `getMap` once to learn the **Small / Large Oil Rig** monument positions, then a
+  **Crate** marker spawning within range of a rig is posted as **`oil_rig_small` / `oil_rig_large`
+  spawned** — plugin-free. Crates elsewhere (Cargo / CH47 drops) are ignored. Rig positions
+  passed into the pure diff, so the placement logic is unit-tested
 
 ---
 
