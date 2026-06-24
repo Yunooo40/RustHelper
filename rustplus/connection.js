@@ -108,6 +108,21 @@ export class Connection {
     const res = await this.rp.sendRequestAsync({ getMapMarkers: {} }, config.rustplus.requestTimeoutMs);
     return res.mapMarkers?.markers ?? [];
   }
+
+  async getEntityAsync(entityId) {
+    const res = await this.rp.sendRequestAsync(
+      { entityId, getEntityInfo: {} },
+      config.rustplus.requestTimeoutMs,
+    );
+    return res.entityInfo;
+  }
+
+  setEntityAsync(entityId, value) {
+    return this.rp.sendRequestAsync(
+      { entityId, setEntityValue: { value: !!value } },
+      config.rustplus.requestTimeoutMs,
+    );
+  }
 }
 
 export default Connection;

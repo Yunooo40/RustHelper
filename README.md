@@ -27,6 +27,7 @@ RustLink-style companion, built with **discord.js + Express + SQLite**.
 | `/events [server]` | List upcoming events, soonest first |
 | `/player <username>` | Player info (stub — needs plugin, later phase) |
 | `/watch add\|list\|remove\|clear` | Alert the channel when a watched teammate disconnects / reconnects (Rust+, needs `/pair`) |
+| `/switch add\|remove\|list\|on\|off\|toggle` | Register and control Rust+ smart switches from Discord or in-game (`!switch`) |
 | `/link` · `/unlink` | Link / unlink your Discord ↔ Rust (Steam) account |
 | `/stats [player]` | K/D stats for a linked player (yours by default) |
 | `/leaderboard` | Top players by K/D ratio |
@@ -247,6 +248,10 @@ The Rust/Oxide plugin should `POST /webhook/rust` with:
     per-server anti-spam window (`RUSTPLUS_CMD_COOLDOWN_MS`) + a `leader` scope
     (broadcasting via `!bot` and re-assigning leadership with `!leader <name>` are
     reserved to the current team leader). Unit-tested with an injected clock
+  → **9** done: **smart switches** — `/switch add entity_id label` registers a switch;
+    `/switch on|off|toggle label` controls it from Discord; `!switch on/off/toggle <label>`
+    (leader-only) and `!switch list` from in-game team chat. `!help` lists all commands.
+    `getEntityAsync` / `setEntityAsync` added to Connection. Model + router handlers tested
   → **8.4** done: **presence watch** — `/watch add` a teammate's Steam id and the bot
     DMs the channel when they **disconnect / reconnect** (detected via the getTeamInfo
     poll). Watch several, `/watch list`, `/watch remove`, `/watch clear`. Pure diff +

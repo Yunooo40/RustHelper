@@ -191,6 +191,21 @@ db.exec(`
     UNIQUE(server_id, steam_id)
   );
   CREATE INDEX IF NOT EXISTS idx_watches_server ON player_watches(server_id);
+
+  -- Smart switches (Phase 9): Rust+ entity ids registered by label so they can be
+  -- toggled via Discord (/switch) or in-game team chat (!switch on/off/toggle).
+  -- entityId is the Rust CCTV/switch entity id (integer printed in the pairing UI).
+  CREATE TABLE IF NOT EXISTS smart_switches (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    server_id   INTEGER NOT NULL REFERENCES servers(id) ON DELETE CASCADE,
+    entity_id   INTEGER NOT NULL,               -- Rust entity id (from /pair or CCTV panel)
+    label       TEXT NOT NULL,                  -- short name used in commands (!switch on Base)
+    added_by    TEXT,                           -- Discord user id who registered it
+    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(server_id, entity_id),
+    UNIQUE(server_id, label COLLATE NOCASE)
+  );
+  CREATE INDEX IF NOT EXISTS idx_switches_server ON smart_switches(server_id);
 `);
 
 export default db;
