@@ -123,6 +123,33 @@ npx @liamcottle/rustplus.js fcm-listen     # then click "Pair" in-game (Rust+ me
 - Kill-switch: set `RUSTPLUS_ENABLED=false` to disable the socket manager entirely.
 - No pairing = no-op: the manager stays idle, so this changes nothing until you opt in.
 
+#### Easier: auto-pair with `/fcm` (Phase 7.2)
+
+Instead of copying four values per server, register **once** and let every server you click
+**"Pair"** on in game pair itself. The Steam login still needs a browser, so run it locally:
+
+```bash
+npx @liamcottle/rustplus.js fcm-register   # Steam login (browser), once
+```
+
+This writes `rustplus.config.json`. Open it and copy `fcm_credentials.gcm.androidId` and
+`fcm_credentials.gcm.securityToken`, then in Discord run (admin-only):
+
+```
+/fcm connect android_id:<androidId> security_token:<securityToken>
+```
+
+Now open the **Rust+ menu in game → "Pair with Server"** on any server you join. The bot
+receives the pairing notification, creates the server (in this Discord) + pairing, and opens
+the socket automatically — verify with `/pop` a few seconds later.
+
+- `security_token` is a **secret** (it receives your push notifications); the reply is
+  ephemeral and never echoes it. `/fcm status` lists active listeners; `/fcm forget <androidId>`
+  stops one. Scripting alternative: `POST /fcm` (admin secret).
+- Kill-switch: `FCM_ENABLED=false` disables the listener; auto-paired servers still work.
+- A server paired this way has **no notification channel** until you `/setup` it (the capture
+  row is adopted) — `/pop` `/time` and in-game `!` commands work regardless.
+
 ---
 
 ## Environment variables reference
@@ -158,5 +185,6 @@ All config is read from env (see [`config.js`](config.js) / [`.env.example`](.en
 | Deploy healthcheck fails | App not binding `PORT`. It is read first in `config.js`; make sure you didn't hard-set a conflicting `API_PORT`/`PORT`. |
 | `better-sqlite3` build error on deploy | Node version drifted from a version with prebuilds. `.nvmrc` + `engines` pin Node `24` (better-sqlite3 `^12` ships its ABI). |
 | Data gone after redeploy | No volume mounted, or `DATABASE_PATH` not pointing at `/data`. |
+| Clicked "Pair" in game but nothing happens | Run `/fcm connect` first (and check `FCM_ENABLED` ≠ false). Re-run `fcm-register` if the token expired (Rust+ tokens lapse after ~2 weeks). Server pairings only — smart-switch/alarm pairings are ignored in 7.2. |
 | Slash commands missing | `npm run deploy-commands` not run, or global registration still propagating (~1h). |
 | Bot crash-loops on boot | Bad/empty `DISCORD_TOKEN`. Process exits 1 on login failure by design; fix the token. |

@@ -233,6 +233,11 @@ The Rust/Oxide plugin should `POST /webhook/rust` with:
   credentials, a reconnecting manager opens one socket per server, in-game **`!pop` / `!time`**
   reply in team chat, and **`/pop` `/time`** mirror them on Discord (model + route + in-game
   router unit-tested; live connect validated at pairing) — ⚠️ pending a live pairing test
+  → **7.1** done & merged (Phase 8.1): in-game team/info commands (`!online` `!offline`
+    `!alive` `!prox` `!leader` `!bot` + event queries `!cargo` `!heli` …)
+  → **7.2** done: **FCM auto-pairing** — register once (`/fcm connect`) and every server you
+    click **"Pair"** on in game auto-creates its pairing + opens the socket (no manual
+    `/pair`). Pure parser + handler unit-tested; listener validated at pairing
   → next (P8+): more in-game commands, smart switches, alarms, storage monitors, map
   → later: PostgreSQL migration, per-user DM opt-in, per-server stats
 
