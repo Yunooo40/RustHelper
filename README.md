@@ -32,6 +32,7 @@ RustLink-style companion, built with **discord.js + Express + SQLite**.
 | `/pop [server]` · `/time [server]` | Live population / in-game time of a paired server (Rust+) |
 | `/map [server]` | Live map image + current events with grid refs (Rust+) |
 | `/pair` · `/unpair` | Pair / unpair a tracked server with Rust+ (admin) |
+| `/diag [server]` | Capture raw Rust+ data to validate detection (admin; see [live validation](docs/LIVE-VALIDATION.md)) |
 
 **REST API (backend)**
 | Method & Path | Description |
@@ -264,6 +265,11 @@ The Rust/Oxide plugin should `POST /webhook/rust` with:
   creds via `npx @liamcottle/rustplus.js fcm-register` → `RUSTPLUS_FCM_CREDENTIALS`; **idle by
   default** so the deployment is unaffected until configured. Push parsing/classification/
   matching is a pure, unit-tested module; the live receiver is validated at runtime
+- [x] **Phase 10 — Diagnostics / live validation:** a `/diag` admin command + opt-in
+  `RUSTPLUS_DIAG` logging capture the **raw** Rust+ markers/monuments/map-size and FCM pushes
+  (secrets redacted) so a single live session confirms the assumptions every "verify live"
+  feature rests on — marker enum values, oil rig tokens, grid refs, FCM payload shape. See the
+  step-by-step [live validation checklist](docs/LIVE-VALIDATION.md)
 
 ---
 

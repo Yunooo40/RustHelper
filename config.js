@@ -63,6 +63,10 @@ export const config = {
       enabled: env.RUSTPLUS_FCM_ENABLED !== 'false',
       credentialsPath: env.RUSTPLUS_FCM_CREDENTIALS ?? '',
     },
+    // Diagnostics (Phase 10). When on, log raw Rust+ markers/monuments once per connect and
+    // raw FCM pushes (secrets redacted) — to confirm the 'verify live' assumptions (marker
+    // enum values, oil rig tokens, grid, FCM shape) on a real server. Opt-in; off by default.
+    diag: env.RUSTPLUS_DIAG === 'true',
   },
 };
 

@@ -10,6 +10,7 @@ import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import { config } from '../config.js';
 import { classifyNotification, matchPairingServerId } from './fcm.js';
+import { safePushView } from './diag.js';
 import * as Servers from '../backend/models/server.js';
 import * as Pairings from '../backend/models/pairing.js';
 import { bus, ALARM_EVENT } from '../shared/bus.js';
@@ -34,6 +35,9 @@ function loadGcmKeys(path) {
 // Resolve which tracked server + channel an alarm belongs to, then emit for the bot.
 // Exported so it can be unit-tested with the bus without a live FCM socket.
 export function handleNotification(raw) {
+  if (config.rustplus.diag) {
+    console.log('[fcm][diag] push received:', JSON.stringify(safePushView(raw)));
+  }
   const note = classifyNotification(raw);
   if (!note || note.kind !== 'alarm') return null; // only Smart Alarms reach Discord
 

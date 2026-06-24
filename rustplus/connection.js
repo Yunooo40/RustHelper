@@ -11,6 +11,7 @@ import RustPlus from '@liamcottle/rustplus.js';
 import { config } from '../config.js';
 import { handleTeamMessage } from './router.js';
 import { diffMarkers, oilRigsFromMap } from './markers.js';
+import { summarizeMarkers, summarizeMonuments } from './diag.js';
 import * as Servers from '../backend/models/server.js';
 import { recordRustEvent } from '../backend/ingest.js';
 
@@ -123,6 +124,9 @@ export class Connection {
     if (!this.markersSeeded) {
       this.markers = markers;
       this.markersSeeded = true;
+      if (config.rustplus.diag) {
+        console.log(`[rustplus][diag] markers (server #${this.serverId}):`, JSON.stringify(summarizeMarkers(markers)));
+      }
       return;
     }
     const events = diffMarkers(this.markers, markers, this.oilRigs);
@@ -145,6 +149,9 @@ export class Connection {
       this.oilRigs = oilRigsFromMap(map);
       if (this.oilRigs.length) {
         console.log(`[rustplus] mapped ${this.oilRigs.length} oil rig(s) (server #${this.serverId})`);
+      }
+      if (config.rustplus.diag) {
+        console.log(`[rustplus][diag] monuments (server #${this.serverId}):`, JSON.stringify(summarizeMonuments(map)));
       }
     } catch (err) {
       console.error(`[rustplus] getMap failed (server #${this.serverId}):`, err?.message ?? err);
