@@ -242,6 +242,10 @@ The Rust/Oxide plugin should `POST /webhook/rust` with:
     announces **Cargo Ship / Patrol Heli / Chinook** the instant they appear (works on
     official servers, no plugin). Pure classify/diff unit-tested; tune with
     `RUSTPLUS_POLL_INTERVAL_MS`, kill-switch `RUSTPLUS_POLL_ENABLED=false`
+  → **8.3** done: **cooldowns & permissions** for in-game `!` commands — per-command,
+    per-server anti-spam window (`RUSTPLUS_CMD_COOLDOWN_MS`) + a `leader` scope
+    (broadcasting via `!bot` and re-assigning leadership with `!leader <name>` are
+    reserved to the current team leader). Unit-tested with an injected clock
   → next (P8+): more in-game commands, smart switches, alarms, storage monitors, map
   → later: PostgreSQL migration, per-user DM opt-in, per-server stats
 

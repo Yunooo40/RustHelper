@@ -1,9 +1,12 @@
 // Unit tests for the in-game command router — pure logic, fake Rust+ client, no socket.
 import { db } from '../helpers/testApp.js'; // first: sets DATABASE_PATH=:memory:
-import { test } from 'node:test';
+import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import * as Timers from '../../backend/models/timer.js';
-import { handleTeamMessage, parseCommand, formatPop, formatTime } from '../../rustplus/router.js';
+import { handleTeamMessage, parseCommand, formatPop, formatTime, resetCooldowns } from '../../rustplus/router.js';
+
+// Cooldowns are module-global per (server, command); clear them so each test starts fresh.
+beforeEach(() => resetCooldowns());
 
 function fakeClient(over = {}) {
   const sent = [];
@@ -88,6 +91,7 @@ test('parseCommand: extrait { cmd, args }, null si pas une commande', () => {
 // ── Phase 8.1 — équipe & events in-game ─────────────────────────────────────────
 
 const team = {
+  leaderSteamId: 'me', // Bob is the current team leader
   members: [
     { steamId: 'me', name: 'Bob', x: 0, y: 0, isOnline: true, isAlive: true, spawnTime: 1000 },
     { steamId: 'a', name: 'Alice', x: 100, y: 100, isOnline: true, isAlive: true, spawnTime: 2000 },
@@ -133,10 +137,47 @@ test('!leader nom inconnu → erreur, aucune promotion', async () => {
   assert.match(c.sent[0], /introuvable/);
 });
 
-test('!bot foo bar → relaie le texte tel quel', async () => {
-  const c = fakeClient();
-  await handleTeamMessage(teamMsg('!bot foo bar'), c, SELF);
+test('!bot foo bar (par le chef) → relaie le texte tel quel', async () => {
+  const c = fakeClient({ teamInfo: team }); // appelant 'me' = chef
+  await handleTeamMessage(teamMsg('!bot foo bar', 'me'), c, SELF);
   assert.deepEqual(c.sent, ['foo bar']);
+});
+
+// ── Phase 8.3 — cooldowns & permissions ─────────────────────────────────────────
+
+test('cooldown: 2e !pop dans la fenêtre → ignoré (1 seul envoi)', async () => {
+  const c = fakeClient({ serverId: 1 });
+  assert.equal(await handleTeamMessage(teamMsg('!pop'), c, SELF, { now: 1000 }), '!pop');
+  assert.equal(await handleTeamMessage(teamMsg('!pop'), c, SELF, { now: 3000 }), null);
+  assert.equal(c.sent.length, 1, 'le spam est silencieusement ignoré');
+});
+
+test('cooldown: après la fenêtre → de nouveau autorisé', async () => {
+  const c = fakeClient({ serverId: 1 });
+  await handleTeamMessage(teamMsg('!pop'), c, SELF, { now: 1000 });
+  assert.equal(await handleTeamMessage(teamMsg('!pop'), c, SELF, { now: 10_000 }), '!pop');
+  assert.equal(c.sent.length, 2);
+});
+
+test('cooldown: indépendant par serveur', async () => {
+  const a = fakeClient({ serverId: 1 });
+  const b = fakeClient({ serverId: 2 });
+  await handleTeamMessage(teamMsg('!pop'), a, SELF, { now: 1000 });
+  assert.equal(await handleTeamMessage(teamMsg('!pop'), b, SELF, { now: 1000 }), '!pop', 'autre serveur non bloqué');
+});
+
+test('scope leader: !bot par un non-chef → refusé', async () => {
+  const c = fakeClient({ teamInfo: team }); // chef = 'me'
+  const out = await handleTeamMessage(teamMsg('!bot coucou', 'a'), c, SELF); // Alice ≠ chef
+  assert.equal(out, null);
+  assert.deepEqual(c.sent, ['❌ Réservé au chef d’équipe']);
+});
+
+test('!leader <nom> par un non-chef → refusé, aucune promotion', async () => {
+  const c = fakeClient({ teamInfo: team }); // chef = 'me'
+  await handleTeamMessage(teamMsg('!leader Alice', 'a'), c, SELF); // Alice ≠ chef
+  assert.deepEqual(c.promoted, []);
+  assert.match(c.sent[0], /Seul le chef/);
 });
 
 test('!cargo avec timer actif → compte à rebours', async () => {

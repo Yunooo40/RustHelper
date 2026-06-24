@@ -12,6 +12,7 @@ import { formatOnline, formatOffline, formatAlive, formatProx } from './teamForm
 import * as Timers from '../backend/models/timer.js';
 import { resolveEvent, eventEmoji, eventLabel } from '../shared/events.js';
 import { nowUnix, formatCountdown } from '../shared/time.js';
+import { config } from '../config.js';
 
 // ── Reply formatters (pure — unit-tested directly) ──────────────────────────────
 
@@ -28,13 +29,18 @@ export function formatTime(time) {
   return `🕑 Il est ${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} en jeu`;
 }
 
-// Promote the caller (no arg) or the named member to team leader.
+// Promote the caller (no arg) or the named member to team leader. Re-assigning
+// leadership to SOMEONE ELSE is reserved to the current team leader; self-promotion
+// stays open (the bot hands leadership over only if it is itself leader anyway).
 async function handleLeader(client, msg, args) {
   if (!args) {
     await client.promoteToLeaderAsync(msg.steamId);
     return client.sendTeamMessageAsync(`👑 ${msg.name} est promu chef`);
   }
   const info = await client.getTeamInfoAsync();
+  if (String(info?.leaderSteamId) !== String(msg.steamId)) {
+    return client.sendTeamMessageAsync('❌ Seul le chef peut nommer un autre chef');
+  }
   const target = (info?.members ?? []).find(
     (m) => (m.name ?? '').toLowerCase() === args.toLowerCase(),
   );
@@ -58,22 +64,42 @@ function eventHandler(alias) {
 }
 
 // ── Dispatch table ──────────────────────────────────────────────────────────────
-// Handlers receive (client, msg, args): `msg` is the AppTeamMessage, `args` the text
-// after the command token. Pull-only — each replies via sendTeamMessageAsync.
+// Each entry is a SPEC: { handler, cooldownMs, scope }. Handlers receive
+// (client, msg, args): `msg` is the AppTeamMessage, `args` the text after the command
+// token. Pull-only — each replies via sendTeamMessageAsync.
+//   cooldownMs — anti-spam window per command per server (config default; 0 disables).
+//   scope      — 'all' (any teammate) | 'leader' (only the current team leader).
+function cmd(handler, { cooldownMs = config.rustplus.commandCooldownMs, scope = 'all' } = {}) {
+  return { handler, cooldownMs, scope };
+}
 
 const COMMANDS = {
-  '!pop': async (client) => client.sendTeamMessageAsync(formatPop(await client.getInfoAsync())),
-  '!time': async (client) => client.sendTeamMessageAsync(formatTime(await client.getTimeAsync())),
-  '!online': async (client) => client.sendTeamMessageAsync(formatOnline(await client.getTeamInfoAsync())),
-  '!offline': async (client) => client.sendTeamMessageAsync(formatOffline(await client.getTeamInfoAsync())),
-  '!alive': async (client) => client.sendTeamMessageAsync(formatAlive(await client.getTeamInfoAsync())),
-  '!prox': async (client, msg) => client.sendTeamMessageAsync(formatProx(await client.getTeamInfoAsync(), msg.steamId)),
-  '!bot': async (client, msg, args) => client.sendTeamMessageAsync(args || 'Usage : !bot <message>'),
-  '!leader': handleLeader,
+  '!pop': cmd(async (client) => client.sendTeamMessageAsync(formatPop(await client.getInfoAsync()))),
+  '!time': cmd(async (client) => client.sendTeamMessageAsync(formatTime(await client.getTimeAsync()))),
+  '!online': cmd(async (client) => client.sendTeamMessageAsync(formatOnline(await client.getTeamInfoAsync()))),
+  '!offline': cmd(async (client) => client.sendTeamMessageAsync(formatOffline(await client.getTeamInfoAsync()))),
+  '!alive': cmd(async (client) => client.sendTeamMessageAsync(formatAlive(await client.getTeamInfoAsync()))),
+  '!prox': cmd(async (client, msg) => client.sendTeamMessageAsync(formatProx(await client.getTeamInfoAsync(), msg.steamId))),
+  // Broadcasting arbitrary text through the bot is leader-only (anti-abuse / anti-spam).
+  '!bot': cmd(async (client, msg, args) => client.sendTeamMessageAsync(args || 'Usage : !bot <message>'), { scope: 'leader' }),
+  '!leader': cmd(handleLeader),
 };
 COMMANDS['!proximity'] = COMMANDS['!prox']; // alias
 for (const alias of ['cargo', 'small', 'large', 'heli']) {
-  COMMANDS[`!${alias}`] = eventHandler(alias);
+  COMMANDS[`!${alias}`] = cmd(eventHandler(alias));
+}
+
+// Per-command rate-limit state: `${serverId}|${cmd}` -> last-run epoch ms.
+const lastRun = new Map();
+
+// Clear all cooldown windows (used by tests; harmless in prod).
+export function resetCooldowns() {
+  lastRun.clear();
+}
+
+async function isLeader(client, steamId) {
+  const info = await client.getTeamInfoAsync();
+  return String(info?.leaderSteamId) === String(steamId);
 }
 
 // Parse a "!" command: { cmd, args } with cmd lowercased and args = text after the
@@ -88,16 +114,34 @@ export function parseCommand(text) {
 
 // Handle one incoming team-chat broadcast (= AppMessage.broadcast.teamMessage).
 // `selfSteamId` is our pairing's steam id. Returns the command name handled (for
-// logging/tests), or null when the message is ignored (our echo / not a command).
-export async function handleTeamMessage(teamMessage, client, selfSteamId) {
+// logging/tests), or null when the message is ignored — our echo, not a command,
+// rate-limited, or refused by the command's permission scope.
+export async function handleTeamMessage(teamMessage, client, selfSteamId, { now = Date.now() } = {}) {
   const msg = teamMessage?.message; // AppTeamMessage: { steamId, name, message, color }
   if (!msg || typeof msg.message !== 'string') return null;
   if (selfSteamId && String(msg.steamId) === String(selfSteamId)) return null; // ignore our own echo
   const parsed = parseCommand(msg.message);
   if (!parsed) return null;
-  const handler = COMMANDS[parsed.cmd];
-  if (!handler) return null;
-  await handler(client, msg, parsed.args);
+  const command = COMMANDS[parsed.cmd];
+  if (!command) return null;
+
+  // Anti-spam: one run per command per server within the cooldown window — silently
+  // dropped (no reply) so spam can't be amplified. The stamp is set once we commit to
+  // acting, so even a permission-refused reply is rate-limited.
+  if (command.cooldownMs > 0) {
+    const key = `${client.serverId}|${parsed.cmd}`;
+    const last = lastRun.get(key);
+    if (last != null && now - last < command.cooldownMs) return null;
+    lastRun.set(key, now);
+  }
+
+  // Permission scope: 'leader' commands only run for the current team leader.
+  if (command.scope === 'leader' && !(await isLeader(client, msg.steamId))) {
+    await client.sendTeamMessageAsync('❌ Réservé au chef d’équipe');
+    return null;
+  }
+
+  await command.handler(client, msg, parsed.args);
   return parsed.cmd;
 }
 

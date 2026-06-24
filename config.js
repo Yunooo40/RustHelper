@@ -49,6 +49,9 @@ export const config = {
     },
     // Safety timeout for a single Rust+ request (getInfo/getTime/...) before we reject.
     requestTimeoutMs: Number(env.RUSTPLUS_REQUEST_TIMEOUT_MS ?? 10_000),
+    // Anti-spam cooldown (ms) per in-game "!" command, per server: a command can only
+    // run once within this window however many teammates fire it. 0 disables cooldowns.
+    commandCooldownMs: Number(env.RUSTPLUS_CMD_COOLDOWN_MS ?? 5_000),
     // FCM auto-pairing (Phase 7.2): listen for Rust+ "Pair with Server" push
     // notifications and create the pairing automatically. The Steam OAuth step
     // (fcm-register) is done locally; only the android_id/security_token credentials
