@@ -108,6 +108,65 @@ export function deathEmbed({ serverName, victimName, victimDiscordId, killerName
   return embed;
 }
 
+// Full command reference (Phase 9.1). Grouped by area; reflects every slash command
+// plus the in-game "!" commands so a new user sees everything at a glance.
+export function helpEmbed() {
+  return new EmbedBuilder()
+    .setColor(COLOR)
+    .setTitle('📖 RustLink — commandes')
+    .setDescription('Tout ce que le bot sait faire. Les commandes admin demandent « Gérer le serveur ».')
+    .addFields(
+      {
+        name: '🗂️ Serveurs',
+        value: [
+          '`/setup <nom> [salon]` — suivre un serveur Rust (admin)',
+          '`/servers` — lister les serveurs suivis (⭐ = défaut)',
+          '`/server-default <nom>` · `/server-remove <nom>` — gérer (admin)',
+        ].join('\n'),
+      },
+      {
+        name: '⏱️ Events & timers',
+        value: [
+          '`/status [serveur]` — timers des events',
+          '`/events [serveur]` — prochains events',
+          '`/timer <event> <minutes> [serveur]` — poser un timer (admin)',
+        ].join('\n'),
+      },
+      {
+        name: '🔗 Rust+ companion',
+        value: [
+          '`/pair …` — lier un serveur à Rust+ (admin)',
+          '`/fcm connect|status|forget` — auto-pairing FCM (admin)',
+          '`/unpair <serveur>` — délier (admin)',
+          '`/pop` · `/time` — population / heure en jeu',
+        ].join('\n'),
+      },
+      {
+        name: '👁️ Présence & ⚡ switches',
+        value: [
+          '`/watch add|list|remove|clear` — alertes déco/reco d’un joueur',
+          '`/switch add|remove|list|on|off|toggle` — smart switches',
+        ].join('\n'),
+      },
+      {
+        name: '👤 Joueurs',
+        value: [
+          '`/link` · `/unlink` — lier ton compte Discord ↔ Steam',
+          '`/stats [joueur]` · `/leaderboard` — K/D',
+          '`/player <pseudo>` — infos joueur',
+        ].join('\n'),
+      },
+      {
+        name: '💬 En jeu (team chat)',
+        value:
+          '`!pop` `!time` `!online` `!offline` `!alive` `!prox` · `!cargo` `!heli` `!small` `!large` · ' +
+          '`!switch list/on/off/toggle` `!leader` `!bot` (chef) · `!help`',
+      },
+    )
+    .setFooter(FOOTER)
+    .setTimestamp();
+}
+
 // Presence alert for a watched player (Phase 8.4). Posted when a watched teammate
 // disconnects or reconnects, detected via the Rust+ getTeamInfo poll.
 export function watchEmbed({ serverName, playerName, online }) {

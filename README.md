@@ -22,6 +22,7 @@ RustLink-style companion, built with **discord.js + Express + SQLite**.
 **Slash commands (Discord)**
 | Command | Description |
 |---|---|
+| `/help` | List every command and what the bot can do |
 | `/setup <server_name> [channel]` | **Track a Rust server** + pick its channel — a Discord can track several (the first becomes the default) |
 | `/servers` | List the Rust servers this Discord tracks (⭐ = default) |
 | `/server-default <name>` · `/server-remove <name>` | Set the default / stop tracking a server (admin) |

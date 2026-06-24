@@ -24,7 +24,7 @@ async function loadCommands() {
 
 test('chaque commande expose { data, execute } et se sérialise (deploy-commands)', async () => {
   const cmds = await loadCommands();
-  assert.ok(cmds.length >= 19, `attendu >=19 commandes, vu ${cmds.length}`);
+  assert.ok(cmds.length >= 20, `attendu >=20 commandes, vu ${cmds.length}`);
   for (const { file, cmd } of cmds) {
     assert.ok(cmd?.data?.name, `${file}: data.name manquant`);
     assert.equal(typeof cmd.execute, 'function', `${file}: execute() manquant`);
@@ -32,11 +32,21 @@ test('chaque commande expose { data, execute } et se sérialise (deploy-commands
   }
 });
 
+test('helpEmbed se construit et liste les grandes familles de commandes', async () => {
+  const { helpEmbed } = await import('../../bot/lib/embeds.js');
+  const json = helpEmbed().toJSON();
+  assert.ok(json.title?.includes('commandes'));
+  const text = JSON.stringify(json);
+  for (const needle of ['/setup', '/pair', '/watch', '/switch', '!pop']) {
+    assert.ok(text.includes(needle), `helpEmbed devrait mentionner ${needle}`);
+  }
+});
+
 test('noms de commande uniques + commandes multi-serveur présentes', async () => {
   const cmds = await loadCommands();
   const names = cmds.map((c) => c.cmd.data.name);
   assert.equal(new Set(names).size, names.length, 'noms de commande dupliqués');
-  for (const n of ['setup', 'servers', 'server-default', 'server-remove', 'status', 'events', 'timer', 'pop', 'time', 'pair', 'unpair', 'notify', 'watch', 'switch', 'fcm']) {
+  for (const n of ['setup', 'servers', 'server-default', 'server-remove', 'status', 'events', 'timer', 'pop', 'time', 'pair', 'unpair', 'notify', 'watch', 'switch', 'fcm', 'help']) {
     assert.ok(names.includes(n), `commande /${n} absente`);
   }
 });
