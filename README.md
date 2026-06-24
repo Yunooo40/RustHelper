@@ -4,15 +4,16 @@ A Discord bot + REST API that tracks **Rust** in-game events — Oil Rig crates,
 Helicopter, Cargo Ship, and more — and posts live timers/notifications to your Discord.
 RustLink-style companion, built with **discord.js + Express + SQLite**.
 
-> **Status:** Phases 1–8.1 done — Discord bot, API, SQLite, the Oxide/Carbon plugin,
+> **Status:** Phases 1–8.2 done — Discord bot, API, SQLite, the Oxide/Carbon plugin,
 > player linking, K/D stats, multi-server tracking, a live **Railway** deploy, and a
 > **Rust+ companion** socket: pair any server with `/pair`, then a full set of in-game
 > team-chat commands — **`!pop` `!time`** plus team info (**`!online` `!offline` `!alive`
-> `!prox`**), event timers (**`!cargo` `!small` `!large` `!heli`**), relay (**`!bot`**) and
-> **`!leader`** — with **`/pop` `/time`** mirrored on Discord (118 tests green, `helmet` +
-> per-IP rate limiting). Rust+ works on *any* server without admin — pending a live pairing
-> test. Next (8.2): team-state poller — connect/disconnect announcements + `!afk`
-> (see [Deployment](DEPLOY.md) + [Roadmap](#-roadmap)).
+> `!prox` `!afk`**), event timers (**`!cargo` `!small` `!large` `!heli`**), relay (**`!bot`**)
+> and **`!leader`** — with **`/pop` `/time`** mirrored on Discord. A background **team poller**
+> announces teammate **connects / disconnects / deaths / AFK** to your channel, toggled per
+> server with **`/notify`**. 144 tests green, `helmet` + per-IP rate limiting. Rust+ works on
+> *any* server without admin — pending a live pairing test. Next (8.3): `!silence` + `!alarm`
+> scheduled timers (see [Deployment](DEPLOY.md) + [Roadmap](#-roadmap)).
 
 ---
 
@@ -31,6 +32,7 @@ RustLink-style companion, built with **discord.js + Express + SQLite**.
 | `/link` · `/unlink` | Link / unlink your Discord ↔ Rust (Steam) account |
 | `/stats [player]` | K/D stats for a linked player (yours by default) |
 | `/leaderboard` | Top players by K/D ratio |
+| `/notify [connections] [deaths] [afk] [server]` | Toggle team-poller announcements per server (admin) |
 
 **REST API (backend)**
 | Method & Path | Description |
@@ -238,10 +240,12 @@ The Rust/Oxide plugin should `POST /webhook/rust` with:
 - [x] **Phase 8.1 — In-game team & info commands:** stateless team-chat commands over Rust+ —
   team info (**`!online` `!offline` `!alive` `!prox`**), event timers (**`!cargo` `!small`
   `!large` `!heli`**), relay (**`!bot`**) and **`!leader`** promotion — all unit-tested
-  (`teamFormat` + router, 118 tests green)
-  → next **8.2**: team-state poller — `getTeamInfo` loop → connect/disconnect announcements +
-    `!afk` (immobile-online) detection
-  → **8.3**: `!silence`/`!resume` + `!alarm`/`!remain`/`!stop` (scheduled, persisted)
+  (`teamFormat` + router)
+- [x] **Phase 8.2 — Team-state poller:** a per-connection `getTeamInfo` loop diffs snapshots
+  and announces teammate **connect / disconnect / death / AFK** to Discord, filtered by a
+  per-server opt-in (**`/notify`**); plus an in-game **`!afk`** query. Pure diff core
+  (`rustplus/teamTracker.js`) unit-tested; 144 tests green
+  → next **8.3**: `!silence`/`!resume` + `!alarm`/`!remain`/`!stop` (scheduled, persisted)
   → later (P10+): smart switches, Rust+ alarms, storage monitors, map; PostgreSQL migration
 
 ---
