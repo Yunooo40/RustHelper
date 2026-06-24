@@ -8,9 +8,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Client, Collection, GatewayIntentBits } from 'discord.js';
-import { bus, RUST_EVENT, DEATH_EVENT } from '../shared/bus.js';
+import { bus, RUST_EVENT, DEATH_EVENT, WATCH_EVENT } from '../shared/bus.js';
 import * as Servers from '../backend/models/server.js';
-import { notificationEmbed, deathEmbed } from './lib/embeds.js';
+import { notificationEmbed, deathEmbed, watchEmbed } from './lib/embeds.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -71,6 +71,15 @@ export async function createBot() {
       await sendToChannel(payload, deathEmbed(payload));
     } catch (err) {
       console.error('[bot] failed to deliver death notification:', err);
+    }
+  });
+
+  // Player presence watch (Phase 8.4).
+  bus.on(WATCH_EVENT, async (payload) => {
+    try {
+      await sendToChannel(payload, watchEmbed(payload));
+    } catch (err) {
+      console.error('[bot] failed to deliver watch notification:', err);
     }
   });
 

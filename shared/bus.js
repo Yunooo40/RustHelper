@@ -19,4 +19,8 @@ export const RUST_EVENT = 'rust-event';
 //            killerDiscordId, cause, distance }
 export const DEATH_EVENT = 'death-event';
 
+// Emitted by the Rust+ team watcher (Phase 8.4) when a watched player connects or
+// disconnects. Consumed by the bot. Payload: { serverName, channelId, playerName, online }
+export const WATCH_EVENT = 'watch-event';
+
 export default bus;
