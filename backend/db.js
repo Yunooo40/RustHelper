@@ -57,7 +57,19 @@ export function migrateServers(database) {
   database.pragma('foreign_keys = ON');
 }
 
+// Phase 8.2 — per-server notification opt-in. Purely additive columns, so a guarded
+// ADD COLUMN is enough (no table rebuild). Idempotent: only adds a column that's absent.
+export function migrateNotifyPrefs(database) {
+  const cols = database.prepare("PRAGMA table_info('servers')").all();
+  if (cols.length === 0) return; // fresh DB — the CREATE TABLE below already includes them
+  const has = (name) => cols.some((c) => c.name === name);
+  if (!has('notify_connections')) database.exec('ALTER TABLE servers ADD COLUMN notify_connections INTEGER NOT NULL DEFAULT 1');
+  if (!has('notify_deaths')) database.exec('ALTER TABLE servers ADD COLUMN notify_deaths INTEGER NOT NULL DEFAULT 1');
+  if (!has('notify_afk')) database.exec('ALTER TABLE servers ADD COLUMN notify_afk INTEGER NOT NULL DEFAULT 0');
+}
+
 migrateServers(db);
+migrateNotifyPrefs(db);
 
 db.exec(`
   -- Rust servers tracked. A Discord guild can track MANY Rust servers (Phase 6); one
@@ -70,6 +82,9 @@ db.exec(`
     webhook_secret TEXT,                        -- optional per-server secret (overrides global)
     is_default     INTEGER NOT NULL DEFAULT 0,  -- the guild's default server (one per guild)
     timezone       TEXT NOT NULL DEFAULT 'UTC',
+    notify_connections INTEGER NOT NULL DEFAULT 1,  -- Phase 8.2 team-poller opt-in
+    notify_deaths      INTEGER NOT NULL DEFAULT 1,
+    notify_afk         INTEGER NOT NULL DEFAULT 0,
     created_at     TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at     TEXT NOT NULL DEFAULT (datetime('now')),
     UNIQUE(guild_id, name)

@@ -157,3 +157,27 @@ export function resolve(guildId, name) {
   if (name) return findByGuildName(guildId, name);
   return getDefault(guildId);
 }
+
+// ── Notification opt-in (Phase 8.2 Rust+ team poller) ────────────────────────────
+const NOTIFY_COLUMNS = { connections: 'notify_connections', deaths: 'notify_deaths', afk: 'notify_afk' };
+
+// Per-server announcement preferences, as booleans. Unknown server → all false.
+export function getNotifyPrefs(serverId) {
+  const row = db
+    .prepare('SELECT notify_connections, notify_deaths, notify_afk FROM servers WHERE id = ?')
+    .get(serverId);
+  if (!row) return { connections: false, deaths: false, afk: false };
+  return {
+    connections: !!row.notify_connections,
+    deaths: !!row.notify_deaths,
+    afk: !!row.notify_afk,
+  };
+}
+
+// Toggle one preference (key ∈ {connections, deaths, afk}). Returns the updated prefs.
+export function setNotifyPref(serverId, key, on) {
+  const column = NOTIFY_COLUMNS[key];
+  if (!column) throw new Error(`Unknown notify pref: ${key}`);
+  db.prepare(`UPDATE servers SET ${column} = ?, updated_at = datetime('now') WHERE id = ?`).run(on ? 1 : 0, serverId);
+  return getNotifyPrefs(serverId);
+}
