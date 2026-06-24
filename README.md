@@ -279,6 +279,10 @@ The Rust/Oxide plugin should `POST /webhook/rust` with:
   (secrets redacted) so a single live session confirms the assumptions every "verify live"
   feature rests on — marker enum values, oil rig tokens, grid refs, FCM payload shape. See the
   step-by-step [live validation checklist](docs/LIVE-VALIDATION.md)
+- [x] **Phase 8.7 — Cooldowns & permissions for in-game commands:** a per-command, per-server
+  anti-spam window (`RUSTPLUS_CMD_COOLDOWN_MS`) drops repeated `!` commands silently, plus a
+  `leader` scope (broadcasting via `!bot` is reserved to the current team leader). Unit-tested
+  with an injected clock
 
 ---
 

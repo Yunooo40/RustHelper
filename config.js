@@ -56,6 +56,9 @@ export const config = {
       enabled: env.RUSTPLUS_MARKERS_ENABLED !== 'false',
       pollMs: Number(env.RUSTPLUS_MARKER_POLL_MS ?? 30_000),
     },
+    // Anti-spam cooldown (ms) per in-game "!" command, per server: a command can only
+    // run once within this window however many teammates fire it. 0 disables cooldowns.
+    commandCooldownMs: Number(env.RUSTPLUS_CMD_COOLDOWN_MS ?? 5_000),
     // Team-state poller (Phase 8.2): how often to sample getTeamInfo, and the AFK rule.
     poll: {
       intervalMs: Number(env.RUSTPLUS_POLL_MS ?? 20_000),     // 3 req/min, well under rate limits
