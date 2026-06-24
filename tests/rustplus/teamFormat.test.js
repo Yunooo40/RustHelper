@@ -1,7 +1,7 @@
 // Unit tests for the pure Rust+ team formatters (Phase 8.1). No socket, no DB.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { formatOnline, formatOffline, formatAlive, formatProx } from '../../rustplus/teamFormat.js';
+import { formatOnline, formatOffline, formatAlive, formatProx, formatAfk } from '../../rustplus/teamFormat.js';
 
 const M = (over) => ({ steamId: 's', name: 'X', x: 0, y: 0, isOnline: true, isAlive: true, spawnTime: 0, ...over });
 
@@ -49,4 +49,12 @@ test('formatProx: appelant introuvable → erreur', () => {
 test('formatProx: aucun coéquipier en ligne', () => {
   const info = { members: [M({ steamId: 'me' }), M({ steamId: 'a', isOnline: false })] };
   assert.equal(formatProx(info, 'me'), '📍 Aucun coéquipier en ligne');
+});
+
+test('formatAfk: liste (minutes) déjà triée ; vide', () => {
+  assert.equal(
+    formatAfk([{ name: 'Bob', afkMs: 12 * 60000 }, { name: 'Alice', afkMs: 6 * 60000 }]),
+    '💤 AFK (2) : Bob (12m), Alice (6m)',
+  );
+  assert.equal(formatAfk([]), '✅ Personne d’AFK');
 });
