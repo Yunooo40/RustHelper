@@ -258,6 +258,12 @@ The Rust/Oxide plugin should `POST /webhook/rust` with:
   current live events (`getMapMarkers`) as a list with **grid references** (e.g. `🚢 Cargo
   Ship — G7`), computed from `getInfo().mapSize`. Grid maths is a pure, unit-tested module
   (community-standard formula; grid labelling to confirm live)
+- [x] **Phase 9 — Smart Alarms → Discord (FCM):** an FCM listener receives Rust+ **Smart
+  Alarm** pushes (raid alarms) and posts them as a red alert embed in the matching server's
+  channel (matched by the alarm's ip/port against your pairings, else by name). Account-level
+  creds via `npx @liamcottle/rustplus.js fcm-register` → `RUSTPLUS_FCM_CREDENTIALS`; **idle by
+  default** so the deployment is unaffected until configured. Push parsing/classification/
+  matching is a pure, unit-tested module; the live receiver is validated at runtime
 
 ---
 

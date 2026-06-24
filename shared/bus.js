@@ -19,4 +19,8 @@ export const RUST_EVENT = 'rust-event';
 //            killerDiscordId, cause, distance }
 export const DEATH_EVENT = 'death-event';
 
+// Emitted by the FCM Smart Alarm listener (Phase 9), consumed by the bot.
+// Payload: { serverName, channelId, title, message }
+export const ALARM_EVENT = 'alarm-event';
+
 export default bus;

@@ -8,9 +8,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Client, Collection, GatewayIntentBits } from 'discord.js';
-import { bus, RUST_EVENT, DEATH_EVENT } from '../shared/bus.js';
+import { bus, RUST_EVENT, DEATH_EVENT, ALARM_EVENT } from '../shared/bus.js';
 import * as Servers from '../backend/models/server.js';
-import { notificationEmbed, deathEmbed } from './lib/embeds.js';
+import { notificationEmbed, deathEmbed, alarmEmbed } from './lib/embeds.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -71,6 +71,15 @@ export async function createBot() {
       await sendToChannel(payload, deathEmbed(payload));
     } catch (err) {
       console.error('[bot] failed to deliver death notification:', err);
+    }
+  });
+
+  // Smart Alarm alerts (Phase 9, FCM).
+  bus.on(ALARM_EVENT, async (payload) => {
+    try {
+      await sendToChannel(payload, alarmEmbed(payload));
+    } catch (err) {
+      console.error('[bot] failed to deliver alarm notification:', err);
     }
   });
 

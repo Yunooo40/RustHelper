@@ -184,6 +184,17 @@ export function timeEmbed(server, time) {
   return embed;
 }
 
+// Smart Alarm alert (Phase 9, Rust+ FCM). Red — distinct from the Rust-orange events — so a
+// raid alarm stands out. `title`/`message` are the alarm's own configured text.
+export function alarmEmbed({ serverName, title, message }) {
+  return new EmbedBuilder()
+    .setColor(0xb71c1c)
+    .setTitle(`🚨 ${title || 'Smart Alarm'}`)
+    .setDescription(message || 'Alarm triggered!')
+    .setFooter({ text: `RustLink · ${serverName ?? 'Rust+'} · Smart Alarm` })
+    .setTimestamp();
+}
+
 // Live map snapshot (Phase 8.5, Rust+). Lists the current events with their grid refs and
 // attaches the server map image. Returns { embed, files } for interaction.editReply().
 // `image` is the AppMap.jpgImage bytes (optional — omitted if getMap is unavailable).

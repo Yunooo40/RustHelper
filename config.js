@@ -56,6 +56,13 @@ export const config = {
       enabled: env.RUSTPLUS_MARKERS_ENABLED !== 'false',
       pollMs: Number(env.RUSTPLUS_MARKER_POLL_MS ?? 30_000),
     },
+    // FCM Smart Alarm listener (Phase 9). Forwards Rust+ Smart Alarm pushes to Discord.
+    // credentialsPath points at the JSON written by `npx @liamcottle/rustplus.js fcm-register`
+    // (account-level push creds, NOT per-server). Empty/missing = listener stays idle.
+    fcm: {
+      enabled: env.RUSTPLUS_FCM_ENABLED !== 'false',
+      credentialsPath: env.RUSTPLUS_FCM_CREDENTIALS ?? '',
+    },
   },
 };
 
