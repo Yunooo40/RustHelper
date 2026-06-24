@@ -8,7 +8,7 @@
 // The `client` is the promisified connection (rustplus/connection.js): it exposes
 // getInfoAsync(), getTimeAsync(), sendTeamMessageAsync(text). Kept as an injected
 // dependency so this whole module is unit-testable with a fake client (no live socket).
-import { formatOnline, formatOffline, formatAlive, formatProx } from './teamFormat.js';
+import { formatOnline, formatOffline, formatAlive, formatProx, formatAfk } from './teamFormat.js';
 import * as Timers from '../backend/models/timer.js';
 import { resolveEvent, eventEmoji, eventLabel } from '../shared/events.js';
 import { nowUnix, formatCountdown } from '../shared/time.js';
@@ -70,6 +70,7 @@ const COMMANDS = {
   '!prox': async (client, msg) => client.sendTeamMessageAsync(formatProx(await client.getTeamInfoAsync(), msg.steamId)),
   '!bot': async (client, msg, args) => client.sendTeamMessageAsync(args || 'Usage : !bot <message>'),
   '!leader': handleLeader,
+  '!afk': async (client) => client.sendTeamMessageAsync(formatAfk(client.tracker.getAfk(Date.now()))),
 };
 COMMANDS['!proximity'] = COMMANDS['!prox']; // alias
 for (const alias of ['cargo', 'small', 'large', 'heli']) {

@@ -49,6 +49,12 @@ export const config = {
     },
     // Safety timeout for a single Rust+ request (getInfo/getTime/...) before we reject.
     requestTimeoutMs: Number(env.RUSTPLUS_REQUEST_TIMEOUT_MS ?? 10_000),
+    // Team-state poller (Phase 8.2): how often to sample getTeamInfo, and the AFK rule.
+    poll: {
+      intervalMs: Number(env.RUSTPLUS_POLL_MS ?? 20_000),     // 3 req/min, well under rate limits
+      afkThresholdMs: Number(env.RUSTPLUS_AFK_MS ?? 300_000), // 5 min immobile
+      afkEpsilon: Number(env.RUSTPLUS_AFK_EPSILON ?? 1.5),    // metres; movement <= is "immobile"
+    },
   },
 };
 

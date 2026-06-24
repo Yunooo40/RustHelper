@@ -3,6 +3,8 @@ import { db, resetDb } from '../helpers/testApp.js';
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import * as Servers from '../../backend/models/server.js';
+import { migrateNotifyPrefs } from '../../backend/db.js';
+import Database from 'better-sqlite3';
 
 beforeEach(() => resetDb());
 
@@ -130,4 +132,33 @@ test('findByName: préfère une row configurée (canal/guild) à une orpheline',
   const found = Servers.findByName('Atlas');
   assert.equal(found.channel_id, 'c1');
   assert.equal(found.guild_id, G);
+});
+
+// ── Phase 8.2 — notify prefs ─────────────────────────────────────────────────────
+
+test('getNotifyPrefs: défauts = connexions+morts ON, AFK OFF', () => {
+  const s = Servers.addServer({ guildId: G, name: 'Atlas', channelId: 'c1' });
+  assert.deepEqual(Servers.getNotifyPrefs(s.id), { connections: true, deaths: true, afk: false });
+});
+
+test('getNotifyPrefs: serveur inconnu → tout false', () => {
+  assert.deepEqual(Servers.getNotifyPrefs(999999), { connections: false, deaths: false, afk: false });
+});
+
+test('setNotifyPref: toggle une préférence, rejette une clé inconnue', () => {
+  const s = Servers.addServer({ guildId: G, name: 'Atlas' });
+  assert.deepEqual(Servers.setNotifyPref(s.id, 'afk', true), { connections: true, deaths: true, afk: true });
+  Servers.setNotifyPref(s.id, 'connections', false);
+  assert.equal(Servers.getNotifyPrefs(s.id).connections, false);
+  assert.throws(() => Servers.setNotifyPref(s.id, 'bogus', true), /Unknown notify pref/);
+});
+
+test('migrateNotifyPrefs: ajoute les colonnes manquantes, idempotent', () => {
+  const mem = new Database(':memory:');
+  mem.exec('CREATE TABLE servers (id INTEGER PRIMARY KEY, name TEXT)'); // schéma pré-8.2
+  migrateNotifyPrefs(mem);
+  const cols = mem.prepare("PRAGMA table_info('servers')").all().map((c) => c.name);
+  assert.ok(['notify_connections', 'notify_deaths', 'notify_afk'].every((c) => cols.includes(c)));
+  assert.doesNotThrow(() => migrateNotifyPrefs(mem)); // 2e passage = no-op
+  mem.close();
 });

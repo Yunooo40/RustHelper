@@ -19,4 +19,9 @@ export const RUST_EVENT = 'rust-event';
 //            killerDiscordId, cause, distance }
 export const DEATH_EVENT = 'death-event';
 
+// Emitted by the Rust+ team poller (Phase 8.2), consumed by the bot.
+// Payload: { channelId, serverName, kind: 'join'|'leave'|'death'|'afk'|'back',
+//            member: { steamId, name }, afkMs? }
+export const TEAM_EVENT = 'team-event';
+
 export default bus;

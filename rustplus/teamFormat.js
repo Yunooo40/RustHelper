@@ -62,3 +62,10 @@ export function formatProx(teamInfo, fromSteamId) {
     .map((p) => `${p.name} ${formatDistance(p.dist)}`);
   return `📍 ${parts.join(' · ')}`;
 }
+
+// AFK list for the !afk command. `entries` = [{ name, afkMs }], already sorted desc.
+export function formatAfk(entries) {
+  if (!entries.length) return '✅ Personne d’AFK';
+  const parts = entries.map((e) => `${e.name} (${Math.round(e.afkMs / 60000)}m)`);
+  return `💤 AFK (${entries.length}) : ${parts.join(', ')}`;
+}
