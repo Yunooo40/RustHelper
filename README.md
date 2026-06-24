@@ -30,6 +30,7 @@ RustLink-style companion, built with **discord.js + Express + SQLite**.
 | `/events [server]` | List upcoming events, soonest first |
 | `/player <username>` | Player info (stub — needs plugin, later phase) |
 | `/watch add\|list\|remove\|clear` | Alert the channel when a watched teammate disconnects / reconnects (Rust+, needs `/pair`) |
+| `/switch add\|remove\|list\|on\|off\|toggle` | Register and control Rust+ smart switches from Discord or in-game (`!switch`) |
 | `/link` · `/unlink` | Link / unlink your Discord ↔ Rust (Steam) account |
 | `/stats [player]` | K/D stats for a linked player (yours by default) |
 | `/leaderboard` | Top players by K/D ratio |
@@ -288,6 +289,11 @@ The Rust/Oxide plugin should `POST /webhook/rust` with:
   the bot announces in the channel when they **disconnect / reconnect** (detected via the
   getTeamInfo poll). `/watch list` · `/watch remove` · `/watch clear`. Pure diff + watcher tick
   unit-tested
+- [x] **Phase 8.9 — Smart switches (`/switch`):** `/switch add <entity_id> <label>` registers a
+  Rust+ smart switch; `/switch on|off|toggle <label>` controls it from Discord, and `!switch
+  list|on|off|toggle <label>` from in-game team chat (control is leader-only). `!help` lists
+  every in-game command. `getEntityAsync` / `setEntityAsync` added to the Connection. Model +
+  router handlers unit-tested
 
 ---
 

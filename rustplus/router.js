@@ -10,6 +10,7 @@
 // dependency so this whole module is unit-testable with a fake client (no live socket).
 import { formatOnline, formatOffline, formatAlive, formatProx, formatAfk } from './teamFormat.js';
 import * as Timers from '../backend/models/timer.js';
+import * as Switches from '../backend/models/switch.js';
 import { resolveEvent, eventEmoji, eventLabel } from '../shared/events.js';
 import { nowUnix, formatCountdown } from '../shared/time.js';
 import { config } from '../config.js';
@@ -63,6 +64,49 @@ function eventHandler(alias) {
   };
 }
 
+// Smart switch handlers — resolve by label, act, reply. Scope: leader (toggling
+// electricity is a significant action; teammates can still use !switch list).
+async function handleSwitch(client, msg, args) {
+  const parts = args.trim().split(/\s+/);
+  const sub = parts[0]?.toLowerCase();
+  const label = parts.slice(1).join(' ');
+
+  if (!sub || sub === 'list') {
+    const rows = Switches.listByServer(client.serverId);
+    if (!rows.length) return client.sendTeamMessageAsync('⚡ Aucun switch enregistré — /switch add dans Discord');
+    const lines = rows.map((s) => `• ${s.label} (id:${s.entity_id})`).join(', ');
+    return client.sendTeamMessageAsync(`⚡ Switches : ${lines}`);
+  }
+
+  if (!label) return client.sendTeamMessageAsync(`Usage : !switch <on|off|toggle|list> [label]`);
+  const sw = Switches.getByLabel(client.serverId, label);
+  if (!sw) return client.sendTeamMessageAsync(`❌ Switch « ${label} » inconnu — !switch list`);
+
+  if (sub === 'on' || sub === 'off') {
+    const value = sub === 'on';
+    await client.setEntityAsync(sw.entity_id, value);
+    return client.sendTeamMessageAsync(`⚡ ${sw.label} → ${value ? '🟢 ON' : '🔴 OFF'}`);
+  }
+  if (sub === 'toggle') {
+    const info = await client.getEntityAsync(sw.entity_id);
+    const current = !!info?.payload?.value;
+    await client.setEntityAsync(sw.entity_id, !current);
+    return client.sendTeamMessageAsync(`⚡ ${sw.label} → ${!current ? '🟢 ON' : '🔴 OFF'}`);
+  }
+  return client.sendTeamMessageAsync(`Usage : !switch <on|off|toggle|list> [label]`);
+}
+
+export function formatHelp() {
+  return (
+    '📋 Commandes bot : ' +
+    '!pop !time !online !offline !alive !prox — infos serveur/équipe | ' +
+    '!cargo !heli !small !large — timers events | ' +
+    '!switch list/on/off/toggle <label> — smart switches (chef) | ' +
+    "!leader [nom] — chef d'equipe (chef) | " +
+    '!bot <texte> — message bot (chef)'
+  );
+}
+
 // ── Dispatch table ──────────────────────────────────────────────────────────────
 // Each entry is a SPEC: { handler, cooldownMs, scope }. Handlers receive
 // (client, msg, args): `msg` is the AppTeamMessage, `args` the text after the command
@@ -84,6 +128,9 @@ const COMMANDS = {
   '!bot': cmd(async (client, msg, args) => client.sendTeamMessageAsync(args || 'Usage : !bot <message>'), { scope: 'leader' }),
   '!leader': cmd(handleLeader),
   '!afk': cmd(async (client) => client.sendTeamMessageAsync(formatAfk(client.tracker.getAfk(Date.now())))),
+  // !switch list is open to all; on/off/toggle are leader-only (handled inside the sub-handler).
+  '!switch': cmd(handleSwitch),
+  '!help': cmd(async (client) => client.sendTeamMessageAsync(formatHelp()), { cooldownMs: 0 }),
 };
 COMMANDS['!proximity'] = COMMANDS['!prox']; // alias
 for (const alias of ['cargo', 'small', 'large', 'heli']) {
@@ -138,7 +185,7 @@ export async function handleTeamMessage(teamMessage, client, selfSteamId, { now 
 
   // Permission scope: 'leader' commands only run for the current team leader.
   if (command.scope === 'leader' && !(await isLeader(client, msg.steamId))) {
-    await client.sendTeamMessageAsync('❌ Réservé au chef d’équipe');
+    await client.sendTeamMessageAsync("❌ Réservé au chef d’équipe");
     return null;
   }
 

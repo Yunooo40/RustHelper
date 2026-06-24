@@ -244,6 +244,22 @@ export class Connection {
   promoteToLeaderAsync(steamId) {
     return this.rp.sendRequestAsync({ promoteToLeader: { steamId } }, config.rustplus.requestTimeoutMs);
   }
+
+  // Smart switches (Phase 9): read an entity's on/off state, and flip a switch on/off.
+  async getEntityAsync(entityId) {
+    const res = await this.rp.sendRequestAsync(
+      { entityId, getEntityInfo: {} },
+      config.rustplus.requestTimeoutMs,
+    );
+    return res.entityInfo;
+  }
+
+  setEntityAsync(entityId, value) {
+    return this.rp.sendRequestAsync(
+      { entityId, setEntityValue: { value: !!value } },
+      config.rustplus.requestTimeoutMs,
+    );
+  }
 }
 
 export default Connection;
