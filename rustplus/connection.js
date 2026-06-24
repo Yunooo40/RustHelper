@@ -10,6 +10,7 @@
 import RustPlus from '@liamcottle/rustplus.js';
 import { config } from '../config.js';
 import { handleTeamMessage } from './router.js';
+import { TeamTracker } from './teamTracker.js';
 
 export class Connection {
   constructor(pairing) {
@@ -21,6 +22,8 @@ export class Connection {
     this.stopped = false;
     this.reconnectDelay = config.rustplus.reconnect.minDelayMs;
     this.reconnectTimer = null;
+    this.tracker = new TeamTracker(this.serverId);
+    this.pollTimer = null;
   }
 
   start() {
@@ -37,6 +40,7 @@ export class Connection {
       this.connected = true;
       this.reconnectDelay = config.rustplus.reconnect.minDelayMs; // reset backoff on success
       console.log(`[rustplus] connected (server #${this.serverId} ${p.server_ip}:${p.app_port})`);
+      this._startPolling();
     });
 
     rp.on('message', (msg) => {
@@ -54,6 +58,7 @@ export class Connection {
 
     rp.on('disconnected', () => {
       this.connected = false;
+      this._stopPolling();
       if (this.stopped) return;
       this._scheduleReconnect();
     });
@@ -71,11 +76,35 @@ export class Connection {
 
   stop() {
     this.stopped = true;
+    this._stopPolling();
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     if (this.rp) {
       try { this.rp.disconnect(); } catch { /* already gone */ }
     }
     this.connected = false;
+  }
+
+  // ── Team-state poll loop (Phase 8.2) ───────────────────────────────────────────
+  _startPolling() {
+    this._stopPolling(); // fresh baseline on each (re)connect
+    this.pollTimer = setInterval(() => {
+      this._pollOnce().catch((err) =>
+        console.error(`[rustplus] poll error (server #${this.serverId}):`, err?.message ?? err),
+      );
+    }, config.rustplus.poll.intervalMs);
+    this.pollTimer.unref?.(); // never keep the process alive just to poll
+  }
+
+  _stopPolling() {
+    if (this.pollTimer) clearInterval(this.pollTimer);
+    this.pollTimer = null;
+    this.tracker.reset();
+  }
+
+  async _pollOnce() {
+    if (!this.connected) return;
+    const teamInfo = await this.getTeamInfoAsync();
+    this.tracker.update(teamInfo, Date.now());
   }
 
   // ── Promisified API (used by the router + Discord /pop /time) ──────────────────
