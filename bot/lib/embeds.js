@@ -1,8 +1,9 @@
 // Discord embed builders, kept in one place so every command/notification
 // looks consistent.
-import { EmbedBuilder } from 'discord.js';
+import { EmbedBuilder, AttachmentBuilder } from 'discord.js';
 import { eventLabel, eventEmoji } from '../../shared/events.js';
 import { discordTime, formatCountdown } from '../../shared/time.js';
+import { describeMapMarkers } from '../../rustplus/grid.js';
 
 const COLOR = 0xce422b; // Rust signature orange-red
 const FOOTER = { text: 'RustLink' };
@@ -181,6 +182,26 @@ export function timeEmbed(server, time) {
     );
   }
   return embed;
+}
+
+// Live map snapshot (Phase 8.5, Rust+). Lists the current events with their grid refs and
+// attaches the server map image. Returns { embed, files } for interaction.editReply().
+// `image` is the AppMap.jpgImage bytes (optional — omitted if getMap is unavailable).
+export function mapEmbed(server, { mapSize, markers, image } = {}) {
+  const lines = describeMapMarkers(markers, mapSize);
+  const embed = new EmbedBuilder()
+    .setColor(COLOR)
+    .setTitle(`🗺️ Live map — ${server?.name ?? 'server'}`)
+    .setDescription(lines.length ? lines.join('\n') : 'No tracked events on the map right now.')
+    .setFooter({ text: 'RustLink · via Rust+' })
+    .setTimestamp();
+
+  const files = [];
+  if (image) {
+    files.push(new AttachmentBuilder(Buffer.from(image), { name: 'map.jpg' }));
+    embed.setImage('attachment://map.jpg');
+  }
+  return { embed, files };
 }
 
 // List of the Rust servers a guild tracks (Phase 6). ⭐ marks the default.

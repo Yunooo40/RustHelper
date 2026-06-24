@@ -29,6 +29,9 @@ RustLink-style companion, built with **discord.js + Express + SQLite**.
 | `/link` · `/unlink` | Link / unlink your Discord ↔ Rust (Steam) account |
 | `/stats [player]` | K/D stats for a linked player (yours by default) |
 | `/leaderboard` | Top players by K/D ratio |
+| `/pop [server]` · `/time [server]` | Live population / in-game time of a paired server (Rust+) |
+| `/map [server]` | Live map image + current events with grid refs (Rust+) |
+| `/pair` · `/unpair` | Pair / unpair a tracked server with Rust+ (admin) |
 
 **REST API (backend)**
 | Method & Path | Description |
@@ -251,6 +254,10 @@ The Rust/Oxide plugin should `POST /webhook/rust` with:
   **Crate** marker spawning within range of a rig is posted as **`oil_rig_small` / `oil_rig_large`
   spawned** — plugin-free. Crates elsewhere (Cargo / CH47 drops) are ignored. Rig positions
   passed into the pure diff, so the placement logic is unit-tested
+- [x] **Phase 8.5 — `/map` command:** posts the server map image (cached `getMap`) plus the
+  current live events (`getMapMarkers`) as a list with **grid references** (e.g. `🚢 Cargo
+  Ship — G7`), computed from `getInfo().mapSize`. Grid maths is a pure, unit-tested module
+  (community-standard formula; grid labelling to confirm live)
 
 ---
 

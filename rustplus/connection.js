@@ -28,6 +28,7 @@ export class Connection {
     this.markers = [];        // last getMapMarkers snapshot, for diffing
     this.markersSeeded = false; // first poll after (re)connect only seeds — see _pollMarkers
     this.pollTimer = null;
+    this.map = null;          // cached AppMap from getMap (image + monuments), refreshed per connect
     this.oilRigs = [];        // oil rig monument positions (from getMap), to place crate markers
   }
 
@@ -46,7 +47,7 @@ export class Connection {
       this.reconnectDelay = config.rustplus.reconnect.minDelayMs; // reset backoff on success
       console.log(`[rustplus] connected (server #${this.serverId} ${p.server_ip}:${p.app_port})`);
       this._startPolling();
-      this._loadOilRigs(); // best-effort; crates stay unattributed until it lands
+      this._loadMap(); // best-effort; crates stay unattributed (and /map image absent) until it lands
     });
 
     rp.on('message', (msg) => {
@@ -133,12 +134,15 @@ export class Connection {
     for (const { eventType, status, marker } of events) this._announce(server, eventType, status, marker);
   }
 
-  // Fetch the static map once per connect and cache the oil rig monument positions, so the
-  // diff can attribute locked-crate spawns to the Small/Large Oil Rig. Best-effort: on
-  // failure oilRigs stays empty and crate markers are simply ignored (no crash).
-  async _loadOilRigs() {
+  // Fetch the static map once per connect and cache it (image for /map + oil rig monument
+  // positions so the diff can attribute locked-crate spawns to the Small/Large Oil Rig).
+  // Best-effort: on failure the cache stays empty, crate markers are ignored and /map drops
+  // the image — no crash.
+  async _loadMap() {
     try {
-      this.oilRigs = oilRigsFromMap(await this.getMapAsync());
+      const map = await this.getMapAsync();
+      this.map = map;
+      this.oilRigs = oilRigsFromMap(map);
       if (this.oilRigs.length) {
         console.log(`[rustplus] mapped ${this.oilRigs.length} oil rig(s) (server #${this.serverId})`);
       }
