@@ -103,6 +103,11 @@ export class Connection {
   promoteToLeaderAsync(steamId) {
     return this.rp.sendRequestAsync({ promoteToLeader: { steamId } }, config.rustplus.requestTimeoutMs);
   }
+
+  async getMapMarkersAsync() {
+    const res = await this.rp.sendRequestAsync({ getMapMarkers: {} }, config.rustplus.requestTimeoutMs);
+    return res.mapMarkers?.markers ?? [];
+  }
 }
 
 export default Connection;

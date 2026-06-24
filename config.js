@@ -56,6 +56,13 @@ export const config = {
     fcm: {
       enabled: env.FCM_ENABLED !== 'false',
     },
+    // Map-marker poller (Phase 8.2): poll getMapMarkers on each connected server and
+    // announce cargo / patrol heli / chinook the moment they appear on the map — no
+    // plugin or admin needed, works on official servers. Kill-switch + interval below.
+    poll: {
+      enabled: env.RUSTPLUS_POLL_ENABLED !== 'false',
+      intervalMs: Number(env.RUSTPLUS_POLL_INTERVAL_MS ?? 30_000),
+    },
   },
 };
 

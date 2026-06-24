@@ -8,16 +8,58 @@
 // Safe no-op when disabled (RUSTPLUS_ENABLED=false) or when no pairing exists — so the
 // current deployment is unaffected until the user pairs a server.
 import * as Pairings from '../backend/models/pairing.js';
+import * as Servers from '../backend/models/server.js';
+import * as Events from '../backend/models/event.js';
+import { bus, RUST_EVENT } from '../shared/bus.js';
+import { nowUnix } from '../shared/time.js';
 import { config } from '../config.js';
 import { Connection } from './connection.js';
+import { MarkerPoller } from './poller.js';
 
 const connections = new Map(); // serverId -> Connection
+const pollers = new Map(); // serverId -> MarkerPoller
+
+// Log + announce a map-marker event (cargo / heli / chinook appearing) for one server.
+// Mirrors the webhook route's notification path so these flow through the same embed.
+// Exported (with an injectable emit) so it's unit-testable without a live bot/socket.
+export function announceMapEvent(serverId, eventType, marker, { emit = bus.emit.bind(bus) } = {}) {
+  const server = Servers.findById(serverId);
+  if (!server) return null;
+  const spawnTime = nowUnix();
+  Events.insert({
+    serverId,
+    eventType,
+    status: 'spawned',
+    spawnTime,
+    nextRespawn: null,
+    payload: { source: 'rustplus', markerId: marker?.id },
+  });
+  const payload = {
+    serverName: server.name,
+    channelId: server.channel_id,
+    eventType,
+    status: 'spawned',
+    spawnTime,
+    nextRespawn: null,
+    source: 'rustplus',
+  };
+  emit(RUST_EVENT, payload);
+  return payload;
+}
 
 function open(pairing) {
   if (connections.has(pairing.server_id)) return connections.get(pairing.server_id);
   const conn = new Connection(pairing);
   connections.set(pairing.server_id, conn);
   conn.start();
+  if (config.rustplus.poll.enabled) {
+    const poller = new MarkerPoller(conn, {
+      intervalMs: config.rustplus.poll.intervalMs,
+      onEvent: (eventType, marker) => announceMapEvent(pairing.server_id, eventType, marker),
+    });
+    pollers.set(pairing.server_id, poller);
+    poller.start();
+  }
   return conn;
 }
 
@@ -43,6 +85,11 @@ export function syncServer(serverId) {
     existing.stop();
     connections.delete(serverId);
   }
+  const poller = pollers.get(serverId);
+  if (poller) {
+    poller.stop();
+    pollers.delete(serverId);
+  }
   if (!config.rustplus.enabled) return undefined;
   const active = Pairings.getActiveForServer(serverId);
   return active ? open(active) : undefined;
@@ -53,6 +100,8 @@ export function getConnection(serverId) {
 }
 
 export function stopManager() {
+  for (const poller of pollers.values()) poller.stop();
+  pollers.clear();
   for (const conn of connections.values()) conn.stop();
   connections.clear();
 }

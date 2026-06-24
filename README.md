@@ -238,6 +238,10 @@ The Rust/Oxide plugin should `POST /webhook/rust` with:
   → **7.2** done: **FCM auto-pairing** — register once (`/fcm connect`) and every server you
     click **"Pair"** on in game auto-creates its pairing + opens the socket (no manual
     `/pair`). Pure parser + handler unit-tested; listener validated at pairing
+  → **8.2** done: **map-marker poller** — polls `getMapMarkers` on each paired server and
+    announces **Cargo Ship / Patrol Heli / Chinook** the instant they appear (works on
+    official servers, no plugin). Pure classify/diff unit-tested; tune with
+    `RUSTPLUS_POLL_INTERVAL_MS`, kill-switch `RUSTPLUS_POLL_ENABLED=false`
   → next (P8+): more in-game commands, smart switches, alarms, storage monitors, map
   → later: PostgreSQL migration, per-user DM opt-in, per-server stats
 
