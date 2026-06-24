@@ -49,6 +49,13 @@ export const config = {
     },
     // Safety timeout for a single Rust+ request (getInfo/getTime/...) before we reject.
     requestTimeoutMs: Number(env.RUSTPLUS_REQUEST_TIMEOUT_MS ?? 10_000),
+    // Live event detection by polling getMapMarkers (Cargo/Heli/Chinook) — no Oxide
+    // plugin required. Disable if the plugin already reports these (avoids double
+    // notifications). pollMs: markers change slowly, so 30s is gentle on the server.
+    markers: {
+      enabled: env.RUSTPLUS_MARKERS_ENABLED !== 'false',
+      pollMs: Number(env.RUSTPLUS_MARKER_POLL_MS ?? 30_000),
+    },
   },
 };
 

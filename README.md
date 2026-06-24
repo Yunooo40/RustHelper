@@ -235,6 +235,12 @@ The Rust/Oxide plugin should `POST /webhook/rust` with:
   router unit-tested; live connect validated at pairing) — ⚠️ pending a live pairing test
   → next (P8+): more in-game commands, smart switches, alarms, storage monitors, map
   → later: PostgreSQL migration, per-user DM opt-in, per-server stats
+- [x] **Phase 8.2 — Plugin-free event detection (Rust+ map markers):** the companion polls
+  `getMapMarkers` and diffs snapshots to announce **Cargo Ship**, **Patrol Helicopter** and
+  **CH47 Chinook** live — on **any paired server, with NO Oxide plugin**. Events flow through
+  the same pipeline as the webhook (history + timers + Discord embed, footer _via Rust+_).
+  Toggle with `RUSTPLUS_MARKERS_ENABLED`; the first poll after each (re)connect only seeds
+  state so already-running events aren't re-announced (pure diff unit-tested)
 
 ---
 

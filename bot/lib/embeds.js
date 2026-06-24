@@ -66,7 +66,13 @@ export function notificationEmbed({ serverName, eventType, status, nextRespawn, 
     .setColor(COLOR)
     .setTitle(`${eventEmoji(eventType)} ${eventLabel(eventType)}`)
     .setDescription(`**${(status ?? 'event').toUpperCase()}** on **${serverName}**`)
-    .setFooter(source === 'ingame' ? { text: 'RustLink · reported in-game' } : FOOTER)
+    .setFooter(
+      source === 'ingame'
+        ? { text: 'RustLink · reported in-game' }
+        : source === 'rustplus'
+          ? { text: 'RustLink · via Rust+' }
+          : FOOTER,
+    )
     .setTimestamp();
 
   if (nextRespawn) {

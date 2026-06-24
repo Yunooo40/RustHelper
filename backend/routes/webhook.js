@@ -12,13 +12,12 @@
 import { Router } from 'express';
 import { verifyWebhookSecret } from '../middleware/auth.js';
 import * as Servers from '../models/server.js';
-import * as Events from '../models/event.js';
-import * as Timers from '../models/timer.js';
 import * as Deaths from '../models/death.js';
 import * as Link from '../models/link.js';
+import { recordRustEvent } from '../ingest.js';
 import { resolveEvent } from '../../shared/events.js';
 import { toUnix } from '../../shared/time.js';
-import { bus, RUST_EVENT, DEATH_EVENT } from '../../shared/bus.js';
+import { bus, DEATH_EVENT } from '../../shared/bus.js';
 
 export function webhookRouter() {
   const router = Router();
@@ -46,24 +45,9 @@ export function webhookRouter() {
     const reportedBy = body.reporter ?? null;
 
     // Capture the server (auto-created if /setup hasn't run yet), log the event,
-    // and refresh the active timer.
+    // refresh the active timer, and notify the bot (no-op if it isn't running).
     const server = Servers.findOrCreateByName(serverName);
-    Events.insert({ serverId: server.id, eventType, status, spawnTime, nextRespawn, payload: body });
-    if (nextRespawn) {
-      Timers.upsert({ serverId: server.id, eventType, expiresAt: nextRespawn, status, source });
-    }
-
-    // Tell the bot to post a notification (ignored if the bot isn't running).
-    bus.emit(RUST_EVENT, {
-      serverName: server.name,
-      channelId: server.channel_id,
-      eventType,
-      status,
-      spawnTime,
-      nextRespawn,
-      source,
-      reportedBy,
-    });
+    recordRustEvent({ server, eventType, status, spawnTime, nextRespawn, source, reporter: reportedBy, payload: body });
 
     return res.json({
       ok: true,

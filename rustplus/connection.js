@@ -10,6 +10,9 @@
 import RustPlus from '@liamcottle/rustplus.js';
 import { config } from '../config.js';
 import { handleTeamMessage } from './router.js';
+import { diffMarkers } from './markers.js';
+import * as Servers from '../backend/models/server.js';
+import { recordRustEvent } from '../backend/ingest.js';
 
 export class Connection {
   constructor(pairing) {
@@ -21,6 +24,10 @@ export class Connection {
     this.stopped = false;
     this.reconnectDelay = config.rustplus.reconnect.minDelayMs;
     this.reconnectTimer = null;
+    // Map-marker poller (live Cargo/Heli/Chinook detection, no plugin).
+    this.markers = [];        // last getMapMarkers snapshot, for diffing
+    this.markersSeeded = false; // first poll after (re)connect only seeds — see _pollMarkers
+    this.pollTimer = null;
   }
 
   start() {
@@ -37,6 +44,7 @@ export class Connection {
       this.connected = true;
       this.reconnectDelay = config.rustplus.reconnect.minDelayMs; // reset backoff on success
       console.log(`[rustplus] connected (server #${this.serverId} ${p.server_ip}:${p.app_port})`);
+      this._startPolling();
     });
 
     rp.on('message', (msg) => {
@@ -54,6 +62,7 @@ export class Connection {
 
     rp.on('disconnected', () => {
       this.connected = false;
+      this._stopPolling();
       if (this.stopped) return;
       this._scheduleReconnect();
     });
@@ -71,11 +80,66 @@ export class Connection {
 
   stop() {
     this.stopped = true;
+    this._stopPolling();
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     if (this.rp) {
       try { this.rp.disconnect(); } catch { /* already gone */ }
     }
     this.connected = false;
+  }
+
+  // ── Map-marker poller (Phase 8.2) ──────────────────────────────────────────────
+  // Poll getMapMarkers and diff snapshots to announce Cargo/Heli/Chinook live, with no
+  // Oxide plugin. Started on 'connected', stopped on 'disconnected'/stop(). The first
+  // poll after every (re)connect only SEEDS state — so we never re-announce an event
+  // that was already happening before we connected (or across a brief reconnect).
+  _startPolling() {
+    if (!config.rustplus.markers.enabled || this.pollTimer) return;
+    this.markers = [];
+    this.markersSeeded = false;
+    const tick = () =>
+      this._pollMarkers().catch((err) =>
+        console.error(`[rustplus] marker poll failed (server #${this.serverId}):`, err?.message ?? err),
+      );
+    this.pollTimer = setInterval(tick, config.rustplus.markers.pollMs);
+    this.pollTimer.unref?.(); // never keep the process alive just to poll
+    tick(); // seed immediately, don't wait a full interval
+  }
+
+  _stopPolling() {
+    if (this.pollTimer) {
+      clearInterval(this.pollTimer);
+      this.pollTimer = null;
+    }
+  }
+
+  async _pollMarkers() {
+    if (!this.connected) return;
+    const markers = await this.getMapMarkersAsync();
+    if (!this.markersSeeded) {
+      this.markers = markers;
+      this.markersSeeded = true;
+      return;
+    }
+    const { spawned, left } = diffMarkers(this.markers, markers);
+    this.markers = markers;
+    if (!spawned.length && !left.length) return;
+
+    const server = Servers.findById(this.serverId);
+    if (!server) return; // server row deleted (unpaired/removed) — nothing to notify
+    for (const { eventType, marker } of spawned) this._announce(server, eventType, 'spawned', marker);
+    for (const { eventType, marker } of left) this._announce(server, eventType, 'left', marker);
+  }
+
+  _announce(server, eventType, status, marker) {
+    console.log(`[rustplus] ${eventType} ${status} on "${server.name}" (server #${this.serverId})`);
+    recordRustEvent({
+      server,
+      eventType,
+      status,
+      source: 'rustplus',
+      payload: { source: 'rustplus', status, marker },
+    });
   }
 
   // ── Promisified API (used by the router + Discord /pop /time) ──────────────────
@@ -98,6 +162,11 @@ export class Connection {
   async getTeamInfoAsync() {
     const res = await this.rp.sendRequestAsync({ getTeamInfo: {} }, config.rustplus.requestTimeoutMs);
     return res.teamInfo;
+  }
+
+  async getMapMarkersAsync() {
+    const res = await this.rp.sendRequestAsync({ getMapMarkers: {} }, config.rustplus.requestTimeoutMs);
+    return res.mapMarkers?.markers ?? [];
   }
 
   promoteToLeaderAsync(steamId) {
