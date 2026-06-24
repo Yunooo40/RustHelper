@@ -1,7 +1,10 @@
-// Unit tests for the Rust+ team tracker. Pure diff core here; class tests added in Task 3.
-import { test } from 'node:test';
+// Unit tests for the Rust+ team tracker.
+import { db, resetDb } from '../helpers/testApp.js'; // first: sets DATABASE_PATH=:memory:
+import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { diffMembers, computeAfk } from '../../rustplus/teamTracker.js';
+import { bus, TEAM_EVENT } from '../../shared/bus.js';
+import { config } from '../../config.js';
+import { diffMembers, computeAfk, TeamTracker } from '../../rustplus/teamTracker.js';
 
 const M = (over) => ({ steamId: 's', name: 'X', x: 0, y: 0, isOnline: true, isAlive: true, ...over });
 
@@ -55,4 +58,80 @@ test('computeAfk: membre offline retiré du posState', () => {
   let s = computeAfk(new Map(), [M({ steamId: 'a' })], 0, { thresholdMs: 1000, epsilon: 1 });
   s = computeAfk(s.posState, [M({ steamId: 'a', isOnline: false })], 100, { thresholdMs: 1000, epsilon: 1 });
   assert.equal(s.posState.has('a'), false);
+});
+
+// ── TeamTracker class (bus + per-server opt-in, DB :memory:) ─────────────────────
+
+beforeEach(() => resetDb());
+
+function seedServer({ channelId = 'chan-1', afk = false } = {}) {
+  return db
+    .prepare("INSERT INTO servers (guild_id, name, channel_id, notify_afk) VALUES ('g', 'Srv', ?, ?)")
+    .run(channelId, afk ? 1 : 0).lastInsertRowid;
+}
+
+function collect() {
+  const events = [];
+  const handler = (p) => events.push(p);
+  bus.on(TEAM_EVENT, handler);
+  return { events, stop: () => bus.off(TEAM_EVENT, handler) };
+}
+
+test('TeamTracker: 1er update = baseline silencieuse', () => {
+  const t = new TeamTracker(seedServer());
+  const sink = collect();
+  t.update({ members: [M({ steamId: 'a', name: 'Alice' })] }, 0);
+  sink.stop();
+  assert.deepEqual(sink.events, []);
+  assert.equal(t.primed, true);
+});
+
+test('TeamTracker: un join après baseline → 1 TEAM_EVENT join', () => {
+  const t = new TeamTracker(seedServer());
+  t.update({ members: [] }, 0); // baseline vide
+  const sink = collect();
+  t.update({ members: [M({ steamId: 'a', name: 'Alice' })] }, 100);
+  sink.stop();
+  assert.equal(sink.events.length, 1);
+  assert.equal(sink.events[0].kind, 'join');
+  assert.equal(sink.events[0].member.name, 'Alice');
+  assert.equal(sink.events[0].channelId, 'chan-1');
+});
+
+test('TeamTracker: pref afk=OFF → passage AFK non émis', () => {
+  const t = new TeamTracker(seedServer({ afk: false }));
+  t.update({ members: [M({ steamId: 'a', x: 0, y: 0 })] }, 0); // baseline
+  const sink = collect();
+  t.update({ members: [M({ steamId: 'a', x: 0, y: 0 })] }, config.rustplus.poll.afkThresholdMs + 1);
+  sink.stop();
+  assert.deepEqual(sink.events.filter((e) => e.kind === 'afk'), []);
+});
+
+test('TeamTracker: sans canal (/setup absent) → n’émet rien', () => {
+  const t = new TeamTracker(seedServer({ channelId: null }));
+  t.update({ members: [] }, 0);
+  const sink = collect();
+  t.update({ members: [M({ steamId: 'a', name: 'Alice' })] }, 100);
+  sink.stop();
+  assert.deepEqual(sink.events, []);
+});
+
+test('TeamTracker.getAfk: immobiles online, triés par durée desc', () => {
+  const t = new TeamTracker(seedServer());
+  const th = config.rustplus.poll.afkThresholdMs;
+  t.update({ members: [M({ steamId: 'a', name: 'Alice', x: 0, y: 0 }), M({ steamId: 'b', name: 'Bob', x: 0, y: 0 })] }, 0);
+  const afk = t.getAfk(th + 5000);
+  assert.deepEqual(afk.map((m) => m.name), ['Alice', 'Bob']);
+  assert.ok(afk[0].afkMs >= th);
+});
+
+test('TeamTracker.reset: re-baseline (le prochain update n’émet rien)', () => {
+  const t = new TeamTracker(seedServer());
+  t.update({ members: [] }, 0);
+  t.reset();
+  assert.equal(t.primed, false);
+  const sink = collect();
+  t.update({ members: [M({ steamId: 'a', name: 'Alice' })] }, 100);
+  sink.stop();
+  assert.deepEqual(sink.events, []); // baseline again
 });

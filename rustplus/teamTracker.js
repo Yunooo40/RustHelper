@@ -2,7 +2,11 @@
 // diffs consecutive snapshots, and announces team changes to Discord via the bus.
 //
 // The diff core (diffMembers, computeAfk) is PURE — no socket, no DB, no bus — so it is
-// unit-tested directly. The TeamTracker class (Task 3) wires it to the bus + opt-in.
+// unit-tested directly. The TeamTracker class wires it to the bus + per-server opt-in.
+import { bus, TEAM_EVENT } from '../shared/bus.js';
+import { config } from '../config.js';
+import * as Servers from '../backend/models/server.js';
+
 const memberMap = (members) => new Map((members ?? []).map((m) => [String(m.steamId), m]));
 const lite = (m) => ({ steamId: String(m.steamId), name: m.name });
 
@@ -56,3 +60,66 @@ export function computeAfk(posState, members, now, { thresholdMs, epsilon }) {
   }
   return { posState: next, nowAfk, returned };
 }
+
+export class TeamTracker {
+  constructor(serverId) {
+    this.serverId = serverId;
+    this.primed = false;
+    this.lastMembers = [];
+    this.posState = new Map();
+  }
+
+  reset() {
+    this.primed = false;
+    this.lastMembers = [];
+    this.posState = new Map();
+  }
+
+  // Feed one getTeamInfo result. The first call after (re)connect only primes the
+  // baseline (emits nothing) so the whole team isn't announced as "joined".
+  update(teamInfo, now) {
+    const members = teamInfo?.members ?? [];
+    const opts = { thresholdMs: config.rustplus.poll.afkThresholdMs, epsilon: config.rustplus.poll.afkEpsilon };
+
+    if (!this.primed) {
+      this.lastMembers = members;
+      this.posState = computeAfk(new Map(), members, now, opts).posState;
+      this.primed = true;
+      return;
+    }
+
+    const { joined, left, died } = diffMembers(this.lastMembers, members);
+    const { posState, nowAfk, returned } = computeAfk(this.posState, members, now, opts);
+    this.lastMembers = members;
+    this.posState = posState;
+
+    const server = Servers.findById(this.serverId);
+    if (!server?.channel_id) return; // not wired to Discord → track silently
+    const prefs = Servers.getNotifyPrefs(this.serverId);
+    const emit = (kind, member, extra) =>
+      bus.emit(TEAM_EVENT, { channelId: server.channel_id, serverName: server.name, kind, member, ...extra });
+
+    if (prefs.connections) {
+      for (const m of joined) emit('join', m);
+      for (const m of left) emit('leave', m);
+    }
+    if (prefs.deaths) for (const m of died) emit('death', m);
+    if (prefs.afk) {
+      for (const m of nowAfk) emit('afk', m, { afkMs: opts.thresholdMs });
+      for (const m of returned) emit('back', m);
+    }
+  }
+
+  // Members currently AFK (online + immobile ≥ threshold), for the !afk command.
+  getAfk(now) {
+    const threshold = config.rustplus.poll.afkThresholdMs;
+    const byId = new Map(this.lastMembers.map((m) => [String(m.steamId), m]));
+    const out = [];
+    for (const [id, st] of this.posState) {
+      const m = byId.get(id);
+      if (m?.isOnline && now - st.since >= threshold) out.push({ steamId: id, name: m.name, afkMs: now - st.since });
+    }
+    return out.sort((a, b) => b.afkMs - a.afkMs);
+  }
+}
+
