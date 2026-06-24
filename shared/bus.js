@@ -28,4 +28,8 @@ export const ALARM_EVENT = 'alarm-event';
 //            member: { steamId, name }, afkMs? }
 export const TEAM_EVENT = 'team-event';
 
+// Emitted by the Rust+ team watcher (Phase 8.4) when a watched player connects or
+// disconnects. Consumed by the bot. Payload: { serverName, channelId, playerName, online }
+export const WATCH_EVENT = 'watch-event';
+
 export default bus;

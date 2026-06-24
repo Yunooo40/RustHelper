@@ -29,6 +29,7 @@ RustLink-style companion, built with **discord.js + Express + SQLite**.
 | `/status [server]` | Show all tracked event timers |
 | `/events [server]` | List upcoming events, soonest first |
 | `/player <username>` | Player info (stub — needs plugin, later phase) |
+| `/watch add\|list\|remove\|clear` | Alert the channel when a watched teammate disconnects / reconnects (Rust+, needs `/pair`) |
 | `/link` · `/unlink` | Link / unlink your Discord ↔ Rust (Steam) account |
 | `/stats [player]` | K/D stats for a linked player (yours by default) |
 | `/leaderboard` | Top players by K/D ratio |
@@ -283,6 +284,10 @@ The Rust/Oxide plugin should `POST /webhook/rust` with:
   anti-spam window (`RUSTPLUS_CMD_COOLDOWN_MS`) drops repeated `!` commands silently, plus a
   `leader` scope (broadcasting via `!bot` is reserved to the current team leader). Unit-tested
   with an injected clock
+- [x] **Phase 8.8 — Player presence watch (`/watch`):** `/watch add` a teammate's Steam id and
+  the bot announces in the channel when they **disconnect / reconnect** (detected via the
+  getTeamInfo poll). `/watch list` · `/watch remove` · `/watch clear`. Pure diff + watcher tick
+  unit-tested
 
 ---
 

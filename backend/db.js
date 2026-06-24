@@ -171,6 +171,20 @@ db.exec(`
     UNIQUE(server_id, steam_id)
   );
   CREATE INDEX IF NOT EXISTS idx_pairings_active ON rustplus_pairings(is_active);
+
+  -- Player presence watches (Phase 8.4): teammates to alert on when they go offline /
+  -- come back online, detected via the Rust+ getTeamInfo poll. One row per (server,
+  -- steam_id); label is an optional friendly name shown in the notification.
+  CREATE TABLE IF NOT EXISTS player_watches (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    server_id   INTEGER NOT NULL REFERENCES servers(id) ON DELETE CASCADE,
+    steam_id    TEXT NOT NULL,                 -- watched player's steam id
+    label       TEXT,                          -- optional friendly name
+    added_by    TEXT,                          -- Discord user id who added it (nullable)
+    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(server_id, steam_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_watches_server ON player_watches(server_id);
 `);
 
 export default db;

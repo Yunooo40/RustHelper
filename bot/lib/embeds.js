@@ -108,6 +108,17 @@ export function deathEmbed({ serverName, victimName, victimDiscordId, killerName
   return embed;
 }
 
+// Presence alert for a watched player (Phase 8.4). Posted when a watched teammate
+// disconnects or reconnects, detected via the Rust+ getTeamInfo poll.
+export function watchEmbed({ serverName, playerName, online }) {
+  return new EmbedBuilder()
+    .setColor(online ? 0x57f287 : 0xed4245) // green online / red offline
+    .setTitle(online ? `🟢 ${playerName} est de retour` : `🔌 ${playerName} s’est déconnecté`)
+    .setDescription(`**${playerName}** ${online ? 'est en ligne' : 'est hors ligne (AFK / déco)'} sur **${serverName}**`)
+    .setFooter(FOOTER)
+    .setTimestamp();
+}
+
 // K/D stats card for a single player (Phase 4.3).
 export function statsEmbed({ name, steamId, discordId, kills, deaths, kd, bestStreak, serverName }) {
   const embed = new EmbedBuilder()
