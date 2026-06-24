@@ -88,9 +88,10 @@ export class Connection {
     this.connected = false;
   }
 
-  // ── Map-marker poller (Phase 8.2) ──────────────────────────────────────────────
-  // Poll getMapMarkers and diff snapshots to announce Cargo/Heli/Chinook live, with no
-  // Oxide plugin. Started on 'connected', stopped on 'disconnected'/stop(). The first
+  // ── Map-marker poller (Phase 8.2/8.3) ──────────────────────────────────────────
+  // Poll getMapMarkers and diff snapshots to announce Cargo/Heli/Chinook spawns and
+  // Heli/Bradley destructions live, with no Oxide plugin. Started on 'connected', stopped
+  // on 'disconnected'/stop(). The first
   // poll after every (re)connect only SEEDS state — so we never re-announce an event
   // that was already happening before we connected (or across a brief reconnect).
   _startPolling() {
@@ -121,14 +122,13 @@ export class Connection {
       this.markersSeeded = true;
       return;
     }
-    const { spawned, left } = diffMarkers(this.markers, markers);
+    const events = diffMarkers(this.markers, markers);
     this.markers = markers;
-    if (!spawned.length && !left.length) return;
+    if (!events.length) return;
 
     const server = Servers.findById(this.serverId);
     if (!server) return; // server row deleted (unpaired/removed) — nothing to notify
-    for (const { eventType, marker } of spawned) this._announce(server, eventType, 'spawned', marker);
-    for (const { eventType, marker } of left) this._announce(server, eventType, 'left', marker);
+    for (const { eventType, status, marker } of events) this._announce(server, eventType, status, marker);
   }
 
   _announce(server, eventType, status, marker) {

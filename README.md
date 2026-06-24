@@ -241,6 +241,11 @@ The Rust/Oxide plugin should `POST /webhook/rust` with:
   the same pipeline as the webhook (history + timers + Discord embed, footer _via Rust+_).
   Toggle with `RUSTPLUS_MARKERS_ENABLED`; the first poll after each (re)connect only seeds
   state so already-running events aren't re-announced (pure diff unit-tested)
+- [x] **Phase 8.3 — Heli & Bradley destructions (explosion markers):** the same poller reads
+  **Explosion** markers (a downed Patrol Helicopter or Bradley APC dropping loot) and posts
+  **`helicopter destroyed`** / **`bradley destroyed`**. Heli-vs-Bradley is inferred by pairing
+  an explosion with a heli marker vanishing the same poll (and the duplicate "heli left" is
+  suppressed). Heuristic — to confirm on a live server
 
 ---
 
