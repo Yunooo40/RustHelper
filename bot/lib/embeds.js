@@ -139,13 +139,16 @@ export function helpEmbed() {
           '`/fcm connect|status|forget` — auto-pairing FCM (admin)',
           '`/unpair <serveur>` — délier (admin)',
           '`/pop` · `/time` — population / heure en jeu',
+          '`/map [serveur]` — carte + events live (cases de grille)',
+          '`/diag [serveur]` — capture des données Rust+ brutes (admin)',
         ].join('\n'),
       },
       {
-        name: '👁️ Présence & ⚡ switches',
+        name: '👁️ Présence, ⚡ switches & 🔔 notifs',
         value: [
           '`/watch add|list|remove|clear` — alertes déco/reco d’un joueur',
           '`/switch add|remove|list|on|off|toggle` — smart switches',
+          '`/notify [connections] [deaths] [afk] [serveur]` — annonces d’équipe (admin)',
         ].join('\n'),
       },
       {
