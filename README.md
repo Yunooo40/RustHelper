@@ -4,16 +4,17 @@ A Discord bot + REST API that tracks **Rust** in-game events — Oil Rig crates,
 Helicopter, Cargo Ship, and more — and posts live timers/notifications to your Discord.
 RustLink-style companion, built with **discord.js + Express + SQLite**.
 
-> **Status:** Phases 1–8.2 done — Discord bot, API, SQLite, the Oxide/Carbon plugin,
-> player linking, K/D stats, multi-server tracking, a live **Railway** deploy, and a
-> **Rust+ companion** socket: pair any server with `/pair`, then a full set of in-game
-> team-chat commands — **`!pop` `!time`** plus team info (**`!online` `!offline` `!alive`
-> `!prox` `!afk`**), event timers (**`!cargo` `!small` `!large` `!heli`**), relay (**`!bot`**)
-> and **`!leader`** — with **`/pop` `/time`** mirrored on Discord. A background **team poller**
-> announces teammate **connects / disconnects / deaths / AFK** to your channel, toggled per
-> server with **`/notify`**. 144 tests green, `helmet` + per-IP rate limiting. Rust+ works on
-> *any* server without admin — pending a live pairing test. Next (8.3): `!silence` + `!alarm`
-> scheduled timers (see [Deployment](DEPLOY.md) + [Roadmap](#-roadmap)).
+> **Status:** Phases 1–10 done — Discord bot, API, SQLite, the Oxide/Carbon plugin, player
+> linking, K/D stats, multi-server tracking, a live **Railway** deploy, and a full **Rust+
+> companion**: pair with `/pair` (or auto-pair via `/fcm connect`), in-game team-chat commands
+> (**`!pop` `!time` `!online` `!offline` `!alive` `!prox` `!afk` `!cargo` `!heli` `!switch`
+> `!leader` `!bot` `!help`**, cooldown- & leader-gated), a background **team poller** (`/notify`
+> connects/disconnects/deaths/AFK), **plugin-free event detection** (Cargo/Heli/Chinook +
+> Heli/Bradley kills + Oil Rig crates via map markers), **`/map`**, **Smart Alarms → Discord**,
+> **`/watch`** presence alerts, **`/switch`** smart switches, and a **`/diag`** capture tool.
+> 247 tests green, `helmet` + per-IP rate limiting. Rust+ works on *any* server without admin —
+> ⚠️ the Rust+ detection/grid/FCM assumptions are still **pending a live-server check** (see
+> [live validation](docs/LIVE-VALIDATION.md), [Deployment](DEPLOY.md), [Roadmap](#-roadmap)).
 
 ---
 
@@ -22,6 +23,7 @@ RustLink-style companion, built with **discord.js + Express + SQLite**.
 **Slash commands (Discord)**
 | Command | Description |
 |---|---|
+| `/help` | List every command and what the bot can do |
 | `/setup <server_name> [channel]` | **Track a Rust server** + pick its channel — a Discord can track several (the first becomes the default) |
 | `/servers` | List the Rust servers this Discord tracks (⭐ = default) |
 | `/server-default <name>` · `/server-remove <name>` | Set the default / stop tracking a server (admin) |
@@ -29,10 +31,16 @@ RustLink-style companion, built with **discord.js + Express + SQLite**.
 | `/status [server]` | Show all tracked event timers |
 | `/events [server]` | List upcoming events, soonest first |
 | `/player <username>` | Player info (stub — needs plugin, later phase) |
+| `/watch add\|list\|remove\|clear` | Alert the channel when a watched teammate disconnects / reconnects (Rust+, needs `/pair`) |
+| `/switch add\|remove\|list\|on\|off\|toggle` | Register and control Rust+ smart switches from Discord or in-game (`!switch`) |
 | `/link` · `/unlink` | Link / unlink your Discord ↔ Rust (Steam) account |
 | `/stats [player]` | K/D stats for a linked player (yours by default) |
 | `/leaderboard` | Top players by K/D ratio |
+| `/pop [server]` · `/time [server]` | Live population / in-game time of a paired server (Rust+) |
+| `/map [server]` | Live map image + current events with grid refs (Rust+) |
 | `/notify [connections] [deaths] [afk] [server]` | Toggle team-poller announcements per server (admin) |
+| `/pair` · `/unpair` | Pair / unpair a tracked server with Rust+ (admin) |
+| `/diag [server]` | Capture raw Rust+ data to validate detection (admin; see [live validation](docs/LIVE-VALIDATION.md)) |
 
 **REST API (backend)**
 | Method & Path | Description |
@@ -244,9 +252,62 @@ The Rust/Oxide plugin should `POST /webhook/rust` with:
 - [x] **Phase 8.2 — Team-state poller:** a per-connection `getTeamInfo` loop diffs snapshots
   and announces teammate **connect / disconnect / death / AFK** to Discord, filtered by a
   per-server opt-in (**`/notify`**); plus an in-game **`!afk`** query. Pure diff core
-  (`rustplus/teamTracker.js`) unit-tested; 144 tests green
-  → next **8.3**: `!silence`/`!resume` + `!alarm`/`!remain`/`!stop` (scheduled, persisted)
-  → later (P10+): smart switches, Rust+ alarms, storage monitors, map; PostgreSQL migration
+  (`rustplus/teamTracker.js`) unit-tested
+- [x] **Phase 8.3 — Plugin-free event detection (Rust+ map markers):** the companion polls
+  `getMapMarkers` and diffs snapshots to announce **Cargo Ship**, **Patrol Helicopter** and
+  **CH47 Chinook** live — on **any paired server, with NO Oxide plugin**. Same pipeline as the
+  webhook (history + timers + Discord embed, footer _via Rust+_); the first poll after each
+  (re)connect only seeds state so already-running events aren't re-announced (pure diff tested)
+- [x] **Phase 8.4 — Heli & Bradley destructions (explosion markers):** the same poller reads
+  **Explosion** markers (a downed Patrol Helicopter or Bradley APC dropping loot) and posts
+  **`helicopter destroyed`** / **`bradley destroyed`**. Heli-vs-Bradley is inferred by pairing
+  an explosion with a heli marker vanishing the same poll (and the duplicate "heli left" is
+  suppressed). Heuristic — to confirm on a live server
+- [x] **Phase 8.5 — Oil Rig locked crates (map + crate markers):** on connect the companion
+  fetches `getMap` once to learn the **Small / Large Oil Rig** monument positions, then a
+  **Crate** marker spawning within range of a rig is posted as **`oil_rig_small` / `oil_rig_large`
+  spawned** — plugin-free. Crates elsewhere (Cargo / CH47 drops) are ignored. Rig positions
+  passed into the pure diff, so the placement logic is unit-tested
+- [x] **Phase 8.6 — `/map` command:** posts the server map image (cached `getMap`) plus the
+  current live events (`getMapMarkers`) as a list with **grid references** (e.g. `🚢 Cargo
+  Ship — G7`), computed from `getInfo().mapSize`. Grid maths is a pure, unit-tested module
+  (community-standard formula; grid labelling to confirm live)
+- [x] **Phase 9 — Smart Alarms → Discord (FCM):** an FCM listener receives Rust+ **Smart
+  Alarm** pushes (raid alarms) and posts them as a red alert embed in the matching server's
+  channel (matched by the alarm's ip/port against your pairings, else by name). Account-level
+  creds via `npx @liamcottle/rustplus.js fcm-register` → `RUSTPLUS_FCM_CREDENTIALS`; **idle by
+  default** so the deployment is unaffected until configured. Push parsing/classification/
+  matching is a pure, unit-tested module; the live receiver is validated at runtime
+- [x] **Phase 10 — Diagnostics / live validation:** a `/diag` admin command + opt-in
+  `RUSTPLUS_DIAG` logging capture the **raw** Rust+ markers/monuments/map-size and FCM pushes
+  (secrets redacted) so a single live session confirms the assumptions every "verify live"
+  feature rests on — marker enum values, oil rig tokens, grid refs, FCM payload shape. See the
+  step-by-step [live validation checklist](docs/LIVE-VALIDATION.md)
+- [x] **Phase 8.7 — Cooldowns & permissions for in-game commands:** a per-command, per-server
+  anti-spam window (`RUSTPLUS_CMD_COOLDOWN_MS`) drops repeated `!` commands silently, plus a
+  `leader` scope (broadcasting via `!bot` is reserved to the current team leader). Unit-tested
+  with an injected clock
+- [x] **Phase 8.8 — Player presence watch (`/watch`):** `/watch add` a teammate's Steam id and
+  the bot announces in the channel when they **disconnect / reconnect** (detected via the
+  getTeamInfo poll). `/watch list` · `/watch remove` · `/watch clear`. Pure diff + watcher tick
+  unit-tested
+- [x] **Phase 8.9 — Smart switches (`/switch`):** `/switch add <entity_id> <label>` registers a
+  Rust+ smart switch; `/switch on|off|toggle <label>` controls it from Discord, and `!switch
+  list|on|off|toggle <label>` from in-game team chat (control is leader-only). `!help` lists
+  every in-game command. `getEntityAsync` / `setEntityAsync` added to the Connection. Model +
+  router handlers unit-tested
+- [x] **Phase 7.2 — FCM auto-pairing (+ unified Smart Alarms):** register once with `/fcm
+  connect` and every server you click **"Pair"** on in game auto-creates its pairing and opens
+  the socket — no manual `/pair`. Credentials live in the DB (`fcm_credentials`), never in env.
+  The **same** FCM listener also forwards Smart Alarm pushes to Discord (Phase 9), so one
+  connection serves both. Pure parser + handlers unit-tested; the live receiver is validated at
+  pairing
+- [x] **Phase 11 — `/help`:** an ephemeral command listing every slash + in-game command, with a
+  unit-tested `helpEmbed`
+
+> **One open thread across all the Rust+ phases:** none of the marker/grid/FCM behaviour has
+> been confirmed on a real server yet — run [`docs/LIVE-VALIDATION.md`](docs/LIVE-VALIDATION.md)
+> with `/diag` to validate (and correct) the assumptions in one session.
 
 ---
 

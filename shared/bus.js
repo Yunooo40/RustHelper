@@ -19,9 +19,17 @@ export const RUST_EVENT = 'rust-event';
 //            killerDiscordId, cause, distance }
 export const DEATH_EVENT = 'death-event';
 
+// Emitted by the FCM Smart Alarm listener (Phase 9), consumed by the bot.
+// Payload: { serverName, channelId, title, message }
+export const ALARM_EVENT = 'alarm-event';
+
 // Emitted by the Rust+ team poller (Phase 8.2), consumed by the bot.
 // Payload: { channelId, serverName, kind: 'join'|'leave'|'death'|'afk'|'back',
 //            member: { steamId, name }, afkMs? }
 export const TEAM_EVENT = 'team-event';
+
+// Emitted by the Rust+ team watcher (Phase 8.4) when a watched player connects or
+// disconnects. Consumed by the bot. Payload: { serverName, channelId, playerName, online }
+export const WATCH_EVENT = 'watch-event';
 
 export default bus;

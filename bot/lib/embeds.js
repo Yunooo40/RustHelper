@@ -1,8 +1,9 @@
 // Discord embed builders, kept in one place so every command/notification
 // looks consistent.
-import { EmbedBuilder } from 'discord.js';
+import { EmbedBuilder, AttachmentBuilder } from 'discord.js';
 import { eventLabel, eventEmoji } from '../../shared/events.js';
 import { discordTime, formatCountdown } from '../../shared/time.js';
+import { describeMapMarkers } from '../../rustplus/grid.js';
 
 const COLOR = 0xce422b; // Rust signature orange-red
 const FOOTER = { text: 'RustLink' };
@@ -66,7 +67,13 @@ export function notificationEmbed({ serverName, eventType, status, nextRespawn, 
     .setColor(COLOR)
     .setTitle(`${eventEmoji(eventType)} ${eventLabel(eventType)}`)
     .setDescription(`**${(status ?? 'event').toUpperCase()}** on **${serverName}**`)
-    .setFooter(source === 'ingame' ? { text: 'RustLink · reported in-game' } : FOOTER)
+    .setFooter(
+      source === 'ingame'
+        ? { text: 'RustLink · reported in-game' }
+        : source === 'rustplus'
+          ? { text: 'RustLink · via Rust+' }
+          : FOOTER,
+    )
     .setTimestamp();
 
   if (nextRespawn) {
@@ -99,6 +106,79 @@ export function deathEmbed({ serverName, victimName, victimDiscordId, killerName
     embed.addFields({ name: 'Distance', value: `${Math.round(Number(distance))} m`, inline: true });
   }
   return embed;
+}
+
+// Full command reference (Phase 9.1). Grouped by area; reflects every slash command
+// plus the in-game "!" commands so a new user sees everything at a glance.
+export function helpEmbed() {
+  return new EmbedBuilder()
+    .setColor(COLOR)
+    .setTitle('📖 RustLink — commandes')
+    .setDescription('Tout ce que le bot sait faire. Les commandes admin demandent « Gérer le serveur ».')
+    .addFields(
+      {
+        name: '🗂️ Serveurs',
+        value: [
+          '`/setup <nom> [salon]` — suivre un serveur Rust (admin)',
+          '`/servers` — lister les serveurs suivis (⭐ = défaut)',
+          '`/server-default <nom>` · `/server-remove <nom>` — gérer (admin)',
+        ].join('\n'),
+      },
+      {
+        name: '⏱️ Events & timers',
+        value: [
+          '`/status [serveur]` — timers des events',
+          '`/events [serveur]` — prochains events',
+          '`/timer <event> <minutes> [serveur]` — poser un timer (admin)',
+        ].join('\n'),
+      },
+      {
+        name: '🔗 Rust+ companion',
+        value: [
+          '`/pair …` — lier un serveur à Rust+ (admin)',
+          '`/fcm connect|status|forget` — auto-pairing FCM (admin)',
+          '`/unpair <serveur>` — délier (admin)',
+          '`/pop` · `/time` — population / heure en jeu',
+          '`/map [serveur]` — carte + events live (cases de grille)',
+          '`/diag [serveur]` — capture des données Rust+ brutes (admin)',
+        ].join('\n'),
+      },
+      {
+        name: '👁️ Présence, ⚡ switches & 🔔 notifs',
+        value: [
+          '`/watch add|list|remove|clear` — alertes déco/reco d’un joueur',
+          '`/switch add|remove|list|on|off|toggle` — smart switches',
+          '`/notify [connections] [deaths] [afk] [serveur]` — annonces d’équipe (admin)',
+        ].join('\n'),
+      },
+      {
+        name: '👤 Joueurs',
+        value: [
+          '`/link` · `/unlink` — lier ton compte Discord ↔ Steam',
+          '`/stats [joueur]` · `/leaderboard` — K/D',
+          '`/player <pseudo>` — infos joueur',
+        ].join('\n'),
+      },
+      {
+        name: '💬 En jeu (team chat)',
+        value:
+          '`!pop` `!time` `!online` `!offline` `!alive` `!prox` · `!cargo` `!heli` `!small` `!large` · ' +
+          '`!switch list/on/off/toggle` `!leader` `!bot` (chef) · `!help`',
+      },
+    )
+    .setFooter(FOOTER)
+    .setTimestamp();
+}
+
+// Presence alert for a watched player (Phase 8.4). Posted when a watched teammate
+// disconnects or reconnects, detected via the Rust+ getTeamInfo poll.
+export function watchEmbed({ serverName, playerName, online }) {
+  return new EmbedBuilder()
+    .setColor(online ? 0x57f287 : 0xed4245) // green online / red offline
+    .setTitle(online ? `🟢 ${playerName} est de retour` : `🔌 ${playerName} s’est déconnecté`)
+    .setDescription(`**${playerName}** ${online ? 'est en ligne' : 'est hors ligne (AFK / déco)'} sur **${serverName}**`)
+    .setFooter(FOOTER)
+    .setTimestamp();
 }
 
 // K/D stats card for a single player (Phase 4.3).
@@ -175,6 +255,37 @@ export function timeEmbed(server, time) {
     );
   }
   return embed;
+}
+
+// Smart Alarm alert (Phase 9, Rust+ FCM). Red — distinct from the Rust-orange events — so a
+// raid alarm stands out. `title`/`message` are the alarm's own configured text.
+export function alarmEmbed({ serverName, title, message }) {
+  return new EmbedBuilder()
+    .setColor(0xb71c1c)
+    .setTitle(`🚨 ${title || 'Smart Alarm'}`)
+    .setDescription(message || 'Alarm triggered!')
+    .setFooter({ text: `RustLink · ${serverName ?? 'Rust+'} · Smart Alarm` })
+    .setTimestamp();
+}
+
+// Live map snapshot (Phase 8.5, Rust+). Lists the current events with their grid refs and
+// attaches the server map image. Returns { embed, files } for interaction.editReply().
+// `image` is the AppMap.jpgImage bytes (optional — omitted if getMap is unavailable).
+export function mapEmbed(server, { mapSize, markers, image } = {}) {
+  const lines = describeMapMarkers(markers, mapSize);
+  const embed = new EmbedBuilder()
+    .setColor(COLOR)
+    .setTitle(`🗺️ Live map — ${server?.name ?? 'server'}`)
+    .setDescription(lines.length ? lines.join('\n') : 'No tracked events on the map right now.')
+    .setFooter({ text: 'RustLink · via Rust+' })
+    .setTimestamp();
+
+  const files = [];
+  if (image) {
+    files.push(new AttachmentBuilder(Buffer.from(image), { name: 'map.jpg' }));
+    embed.setImage('attachment://map.jpg');
+  }
+  return { embed, files };
 }
 
 // List of the Rust servers a guild tracks (Phase 6). ⭐ marks the default.

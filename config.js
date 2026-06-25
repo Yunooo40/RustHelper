@@ -49,12 +49,33 @@ export const config = {
     },
     // Safety timeout for a single Rust+ request (getInfo/getTime/...) before we reject.
     requestTimeoutMs: Number(env.RUSTPLUS_REQUEST_TIMEOUT_MS ?? 10_000),
+    // Live event detection by polling getMapMarkers (Cargo/Heli/Chinook) — no Oxide
+    // plugin required. Disable if the plugin already reports these (avoids double
+    // notifications). pollMs: markers change slowly, so 30s is gentle on the server.
+    markers: {
+      enabled: env.RUSTPLUS_MARKERS_ENABLED !== 'false',
+      pollMs: Number(env.RUSTPLUS_MARKER_POLL_MS ?? 30_000),
+    },
+    // Anti-spam cooldown (ms) per in-game "!" command, per server: a command can only
+    // run once within this window however many teammates fire it. 0 disables cooldowns.
+    commandCooldownMs: Number(env.RUSTPLUS_CMD_COOLDOWN_MS ?? 5_000),
     // Team-state poller (Phase 8.2): how often to sample getTeamInfo, and the AFK rule.
     poll: {
       intervalMs: Number(env.RUSTPLUS_POLL_MS ?? 20_000),     // 3 req/min, well under rate limits
       afkThresholdMs: Number(env.RUSTPLUS_AFK_MS ?? 300_000), // 5 min immobile
       afkEpsilon: Number(env.RUSTPLUS_AFK_EPSILON ?? 1.5),    // metres; movement <= is "immobile"
     },
+    // FCM listener (Phase 7.2 auto-pairing + Phase 9 Smart Alarms). One push listener per
+    // registered credential (stored in the DB via `/fcm connect`) receives Rust+ "Pair with
+    // Server" pushes (auto-create the pairing) AND Smart Alarm pushes (forwarded to Discord).
+    // No-op until a credential is registered. Kill-switch: FCM_ENABLED=false.
+    fcm: {
+      enabled: env.FCM_ENABLED !== 'false',
+    },
+    // Diagnostics (Phase 10). When on, log raw Rust+ markers/monuments once per connect and
+    // raw FCM pushes (secrets redacted) — to confirm the 'verify live' assumptions (marker
+    // enum values, oil rig tokens, grid, FCM shape) on a real server. Opt-in; off by default.
+    diag: env.RUSTPLUS_DIAG === 'true',
   },
 };
 
