@@ -12,6 +12,7 @@ function fakeClient(over = {}) {
     sent,
     promoted,
     serverId: over.serverId,
+    tracker: over.tracker,
     getInfoAsync: async () => ({ players: 120, maxPlayers: 200, queuedPlayers: 5, ...over.info }),
     getTimeAsync: async () => ({ time: 13.5, ...over.time }),
     getTeamInfoAsync: async () => over.teamInfo ?? { members: [] },
@@ -162,4 +163,17 @@ test('formatTime: minuit et midi', () => {
 
 test('formatPop: direct', () => {
   assert.equal(formatPop({ players: 1, maxPlayers: 2, queuedPlayers: 0 }), '👥 1/2 joueurs');
+});
+
+test('!afk → liste les AFK depuis le tracker', async () => {
+  const c = fakeClient({ tracker: { getAfk: () => [{ name: 'Bob', afkMs: 6 * 60000 }] } });
+  const cmd = await handleTeamMessage(teamMsg('!afk'), c, SELF);
+  assert.equal(cmd, '!afk');
+  assert.deepEqual(c.sent, ['💤 AFK (1) : Bob (6m)']);
+});
+
+test('!afk → personne d’AFK', async () => {
+  const c = fakeClient({ tracker: { getAfk: () => [] } });
+  await handleTeamMessage(teamMsg('!afk'), c, SELF);
+  assert.deepEqual(c.sent, ['✅ Personne d’AFK']);
 });

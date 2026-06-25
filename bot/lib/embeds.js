@@ -229,3 +229,21 @@ export function serverListEmbed(servers) {
     .setFooter({ text: 'RustLink · ⭐ default · /server-default to change' })
     .setTimestamp();
 }
+
+// Team-poller announcement (Phase 8.2). One embed per team change.
+const TEAM_EVENT_STYLE = {
+  join:  { emoji: '🟢', color: 0x57f287, verb: 's’est connecté' },
+  leave: { emoji: '⚫', color: 0x99aab5, verb: 's’est déconnecté' },
+  death: { emoji: '💀', color: 0xed4245, verb: 'est mort' },
+  afk:   { emoji: '💤', color: 0xfee75c, verb: 'est AFK' },
+  back:  { emoji: '🟢', color: 0x57f287, verb: 'est de retour' },
+};
+
+export function teamEventEmbed({ serverName, kind, member }) {
+  const style = TEAM_EVENT_STYLE[kind] ?? { emoji: 'ℹ️', color: COLOR, verb: '' };
+  return new EmbedBuilder()
+    .setColor(style.color)
+    .setDescription(`${style.emoji} **${member?.name ?? 'Un joueur'}** ${style.verb}`)
+    .setFooter({ text: `RustLink · ${serverName}` })
+    .setTimestamp();
+}

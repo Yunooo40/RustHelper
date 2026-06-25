@@ -4,13 +4,16 @@ A Discord bot + REST API that tracks **Rust** in-game events — Oil Rig crates,
 Helicopter, Cargo Ship, and more — and posts live timers/notifications to your Discord.
 RustLink-style companion, built with **discord.js + Express + SQLite**.
 
-> **Status:** Phases 1–7 done — Discord bot, API, SQLite, the Oxide/Carbon plugin,
-> in-game chat commands, player linking, K/D stats, multi-server tracking, a live
-> **Railway** deploy, and now a **Rust+ companion** socket: pair any server with `/pair`,
-> then in-game **`!pop` / `!time`** reply in team chat and **`/pop` `/time`** mirror them on
-> Discord (103 tests green, `helmet` + per-IP rate limiting). Rust+ works on *any* server
-> without admin — pending a live pairing test. Next: more in-game commands + smart
-> switches/alarms/storage over Rust+ (see [Deployment](DEPLOY.md) + [Roadmap](#-roadmap)).
+> **Status:** Phases 1–8.2 done — Discord bot, API, SQLite, the Oxide/Carbon plugin,
+> player linking, K/D stats, multi-server tracking, a live **Railway** deploy, and a
+> **Rust+ companion** socket: pair any server with `/pair`, then a full set of in-game
+> team-chat commands — **`!pop` `!time`** plus team info (**`!online` `!offline` `!alive`
+> `!prox` `!afk`**), event timers (**`!cargo` `!small` `!large` `!heli`**), relay (**`!bot`**)
+> and **`!leader`** — with **`/pop` `/time`** mirrored on Discord. A background **team poller**
+> announces teammate **connects / disconnects / deaths / AFK** to your channel, toggled per
+> server with **`/notify`**. 144 tests green, `helmet` + per-IP rate limiting. Rust+ works on
+> *any* server without admin — pending a live pairing test. Next (8.3): `!silence` + `!alarm`
+> scheduled timers (see [Deployment](DEPLOY.md) + [Roadmap](#-roadmap)).
 
 ---
 
@@ -31,6 +34,7 @@ RustLink-style companion, built with **discord.js + Express + SQLite**.
 | `/leaderboard` | Top players by K/D ratio |
 | `/pop [server]` · `/time [server]` | Live population / in-game time of a paired server (Rust+) |
 | `/map [server]` | Live map image + current events with grid refs (Rust+) |
+| `/notify [connections] [deaths] [afk] [server]` | Toggle team-poller announcements per server (admin) |
 | `/pair` · `/unpair` | Pair / unpair a tracked server with Rust+ (admin) |
 | `/diag [server]` | Capture raw Rust+ data to validate detection (admin; see [live validation](docs/LIVE-VALIDATION.md)) |
 
@@ -237,25 +241,30 @@ The Rust/Oxide plugin should `POST /webhook/rust` with:
   credentials, a reconnecting manager opens one socket per server, in-game **`!pop` / `!time`**
   reply in team chat, and **`/pop` `/time`** mirror them on Discord (model + route + in-game
   router unit-tested; live connect validated at pairing) — ⚠️ pending a live pairing test
-  → next (P8+): more in-game commands, smart switches, alarms, storage monitors, map
-  → later: PostgreSQL migration, per-user DM opt-in, per-server stats
-- [x] **Phase 8.2 — Plugin-free event detection (Rust+ map markers):** the companion polls
+- [x] **Phase 8.1 — In-game team & info commands:** stateless team-chat commands over Rust+ —
+  team info (**`!online` `!offline` `!alive` `!prox`**), event timers (**`!cargo` `!small`
+  `!large` `!heli`**), relay (**`!bot`**) and **`!leader`** promotion — all unit-tested
+  (`teamFormat` + router)
+- [x] **Phase 8.2 — Team-state poller:** a per-connection `getTeamInfo` loop diffs snapshots
+  and announces teammate **connect / disconnect / death / AFK** to Discord, filtered by a
+  per-server opt-in (**`/notify`**); plus an in-game **`!afk`** query. Pure diff core
+  (`rustplus/teamTracker.js`) unit-tested
+- [x] **Phase 8.3 — Plugin-free event detection (Rust+ map markers):** the companion polls
   `getMapMarkers` and diffs snapshots to announce **Cargo Ship**, **Patrol Helicopter** and
-  **CH47 Chinook** live — on **any paired server, with NO Oxide plugin**. Events flow through
-  the same pipeline as the webhook (history + timers + Discord embed, footer _via Rust+_).
-  Toggle with `RUSTPLUS_MARKERS_ENABLED`; the first poll after each (re)connect only seeds
-  state so already-running events aren't re-announced (pure diff unit-tested)
-- [x] **Phase 8.3 — Heli & Bradley destructions (explosion markers):** the same poller reads
+  **CH47 Chinook** live — on **any paired server, with NO Oxide plugin**. Same pipeline as the
+  webhook (history + timers + Discord embed, footer _via Rust+_); the first poll after each
+  (re)connect only seeds state so already-running events aren't re-announced (pure diff tested)
+- [x] **Phase 8.4 — Heli & Bradley destructions (explosion markers):** the same poller reads
   **Explosion** markers (a downed Patrol Helicopter or Bradley APC dropping loot) and posts
   **`helicopter destroyed`** / **`bradley destroyed`**. Heli-vs-Bradley is inferred by pairing
   an explosion with a heli marker vanishing the same poll (and the duplicate "heli left" is
   suppressed). Heuristic — to confirm on a live server
-- [x] **Phase 8.4 — Oil Rig locked crates (map + crate markers):** on connect the companion
+- [x] **Phase 8.5 — Oil Rig locked crates (map + crate markers):** on connect the companion
   fetches `getMap` once to learn the **Small / Large Oil Rig** monument positions, then a
   **Crate** marker spawning within range of a rig is posted as **`oil_rig_small` / `oil_rig_large`
   spawned** — plugin-free. Crates elsewhere (Cargo / CH47 drops) are ignored. Rig positions
   passed into the pure diff, so the placement logic is unit-tested
-- [x] **Phase 8.5 — `/map` command:** posts the server map image (cached `getMap`) plus the
+- [x] **Phase 8.6 — `/map` command:** posts the server map image (cached `getMap`) plus the
   current live events (`getMapMarkers`) as a list with **grid references** (e.g. `🚢 Cargo
   Ship — G7`), computed from `getInfo().mapSize`. Grid maths is a pure, unit-tested module
   (community-standard formula; grid labelling to confirm live)

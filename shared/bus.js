@@ -23,4 +23,9 @@ export const DEATH_EVENT = 'death-event';
 // Payload: { serverName, channelId, title, message }
 export const ALARM_EVENT = 'alarm-event';
 
+// Emitted by the Rust+ team poller (Phase 8.2), consumed by the bot.
+// Payload: { channelId, serverName, kind: 'join'|'leave'|'death'|'afk'|'back',
+//            member: { steamId, name }, afkMs? }
+export const TEAM_EVENT = 'team-event';
+
 export default bus;
