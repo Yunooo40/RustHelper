@@ -8,7 +8,7 @@ import { createApiServer } from './backend/server.js';
 import { createBot } from './bot/bot.js';
 import * as Link from './backend/models/link.js';
 import { startManager, stopManager } from './rustplus/manager.js';
-import { startFcmListener, stopFcmListener } from './rustplus/fcmListener.js';
+import { startFcmManager, stopFcmManager } from './rustplus/fcmManager.js';
 
 const apiOnly = process.argv.includes('--api-only');
 const PURGE_INTERVAL_MS = 10 * 60 * 1000; // drop expired link codes every 10 min
@@ -46,8 +46,9 @@ async function main() {
   // a server is paired (/pair). Skipped in --api-only (curl/testing) mode.
   if (!apiOnly) {
     startManager();
-    // 2c) FCM Smart Alarm listener. No-op until RUSTPLUS_FCM_CREDENTIALS is set (fcm-register).
-    startFcmListener();
+    // 2c) FCM listener manager: auto-pairing + Smart Alarms. No-op until /fcm connect
+    // registers a credential.
+    startFcmManager();
   }
 
   // 3) Graceful shutdown: stop accepting connections and wait for in-flight requests
@@ -59,7 +60,7 @@ async function main() {
     console.log(`\n[app] ${signal} received, shutting down...`);
     clearInterval(purgeTimer);
     stopManager();
-    stopFcmListener();
+    stopFcmManager();
     if (client) client.destroy();
     const hard = setTimeout(() => process.exit(0), 10_000);
     hard.unref();

@@ -172,6 +172,27 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_pairings_active ON rustplus_pairings(is_active);
 
+  -- FCM listener credentials (Phase 7.2): one row per registered Rust+ player. Used to
+  -- receive "Pair with Server" push notifications from Facepunch and auto-create the
+  -- rustplus_pairings above (and to forward Smart Alarm pushes to Discord). The Steam OAuth
+  -- (fcm-register) is done locally; only the android_id + security_token land here.
+  -- security_token is a SECRET (it grants receipt of that account's push notifications) —
+  -- never log it or return it over the API. guild_id (when registered via the Discord
+  -- command) routes auto-paired servers into that guild; null leaves them as orphan rows.
+  CREATE TABLE IF NOT EXISTS fcm_credentials (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id        TEXT,                         -- Discord guild that owns auto-paired servers (nullable)
+    discord_user_id TEXT,                         -- who registered it (nullable)
+    label           TEXT,                         -- optional, e.g. the player name
+    android_id      TEXT NOT NULL,                -- FCM gcm.androidId
+    security_token  TEXT NOT NULL,                -- FCM gcm.securityToken (SECRET)
+    is_active       INTEGER NOT NULL DEFAULT 1,
+    created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(android_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_fcm_active ON fcm_credentials(is_active);
+
   -- Player presence watches (Phase 8.4): teammates to alert on when they go offline /
   -- come back online, detected via the Rust+ getTeamInfo poll. One row per (server,
   -- steam_id); label is an optional friendly name shown in the notification.

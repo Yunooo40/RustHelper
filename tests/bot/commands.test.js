@@ -36,7 +36,7 @@ test('noms de commande uniques + commandes multi-serveur présentes', async () =
   const cmds = await loadCommands();
   const names = cmds.map((c) => c.cmd.data.name);
   assert.equal(new Set(names).size, names.length, 'noms de commande dupliqués');
-  for (const n of ['setup', 'servers', 'server-default', 'server-remove', 'status', 'events', 'timer', 'pop', 'time', 'pair', 'unpair', 'notify', 'watch', 'switch']) {
+  for (const n of ['setup', 'servers', 'server-default', 'server-remove', 'status', 'events', 'timer', 'pop', 'time', 'pair', 'unpair', 'notify', 'watch', 'switch', 'fcm']) {
     assert.ok(names.includes(n), `commande /${n} absente`);
   }
 });

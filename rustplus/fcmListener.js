@@ -1,100 +1,59 @@
-// FCM Smart Alarm listener (Phase 9). Connects to Google's push service with the account's
-// FCM credentials and forwards Rust+ Smart Alarm pushes to Discord via the bus.
+// One live FCM push listener (Phase 7.2). Thin I/O wrapper around push-receiver's Client:
+// connects with a credential's (androidId, securityToken) and forwards every incoming
+// notification to a callback. Pure parsing/persistence lives in fcmParser.js / fcmManager.js
+// so this module stays trivial and is validated by hand at pairing time (like connection.js
+// and the Oxide plugin) — tests never open a real socket.
 //
-// This is the integration layer (like rustplus/connection.js): the pure parsing/matching
-// lives in rustplus/fcm.js and is unit-tested; the live receiver is validated at runtime.
-// SAFE NO-OP: with no credentials configured it does nothing, so the current deployment is
-// unaffected until the operator runs `npx @liamcottle/rustplus.js fcm-register` and sets
-// RUSTPLUS_FCM_CREDENTIALS — exactly like the Rust+ manager is idle until a server is paired.
-import fs from 'node:fs';
-import { createRequire } from 'node:module';
-import { config } from '../config.js';
-import { classifyNotification, matchPairingServerId } from './fcm.js';
-import { safePushView } from './diag.js';
-import * as Servers from '../backend/models/server.js';
-import * as Pairings from '../backend/models/pairing.js';
-import { bus, ALARM_EVENT } from '../shared/bus.js';
+// We listen on BOTH events: push-receiver 0.0.3 emits unencrypted payloads via
+// 'ON_DATA_RECEIVED' (the raw DataMessageStanza object), while the decrypted path uses
+// 'ON_NOTIFICATION_RECEIVED' ({ notification, ... }). The parser tolerates either shape;
+// double-delivery is harmless because auto-pairing is idempotent.
+import PushReceiverClient from '@liamcottle/push-receiver/src/client.js';
 
-// @liamcottle/push-receiver is CommonJS and exposes the raw client only via a deep path —
-// the same one @liamcottle/rustplus.js's own CLI imports.
-const require = createRequire(import.meta.url);
-
-let client = null;
-
-// Read the JSON written by `fcm-register` and pull out the GCM keys. Accept either the full
-// rustplus CLI config ({ fcm_credentials: { gcm } }) or a bare credentials object ({ gcm }).
-function loadGcmKeys(path) {
-  const json = JSON.parse(fs.readFileSync(path, 'utf8'));
-  const gcm = json.fcm_credentials?.gcm ?? json.gcm;
-  if (!gcm?.androidId || !gcm?.securityToken) {
-    throw new Error('missing gcm.androidId / gcm.securityToken — re-run `fcm-register`');
-  }
-  return gcm;
-}
-
-// Resolve which tracked server + channel an alarm belongs to, then emit for the bot.
-// Exported so it can be unit-tested with the bus without a live FCM socket.
-export function handleNotification(raw) {
-  if (config.rustplus.diag) {
-    console.log('[fcm][diag] push received:', JSON.stringify(safePushView(raw)));
-  }
-  const note = classifyNotification(raw);
-  if (!note || note.kind !== 'alarm') return null; // only Smart Alarms reach Discord
-
-  let server = null;
-  const serverId = matchPairingServerId(note.server, Pairings.listActive());
-  if (serverId) server = Servers.findById(serverId);
-  if (!server && note.server.name) server = Servers.findByName(note.server.name);
-
-  bus.emit(ALARM_EVENT, {
-    serverName: server?.name ?? note.server.name ?? 'Rust server',
-    channelId: server?.channel_id ?? null,
-    title: note.title,
-    message: note.message,
-  });
-  return note;
-}
-
-export function startFcmListener() {
-  if (client) return client;
-  const { enabled, credentialsPath } = config.rustplus.fcm;
-  if (!enabled || !credentialsPath) {
-    console.log('[fcm] no credentials configured; Smart Alarm listener idle (set RUSTPLUS_FCM_CREDENTIALS).');
-    return null;
+export class FcmListener {
+  constructor(credential, onNotification) {
+    this.credential = credential;
+    this.onNotification = onNotification; // (notification) => void
+    this.client = null;
+    this.stopped = false;
   }
 
-  let gcm;
-  try {
-    gcm = loadGcmKeys(credentialsPath);
-  } catch (err) {
-    console.error('[fcm] failed to load credentials:', err?.message ?? err);
-    return null;
+  async start() {
+    this.stopped = false;
+    const client = new PushReceiverClient(
+      this.credential.android_id,
+      this.credential.security_token,
+      [], // persistentIds: start fresh; replays are idempotent so we don't persist them
+    );
+    this.client = client;
+
+    const forward = (payload) => {
+      if (this.stopped) return;
+      // ON_DATA_RECEIVED → raw object; ON_NOTIFICATION_RECEIVED → { notification, ... }.
+      const notification = payload?.notification ?? payload;
+      try {
+        this.onNotification(notification);
+      } catch (err) {
+        console.error('[fcm] notification handler error:', err?.message ?? err);
+      }
+    };
+
+    client.on('ON_DATA_RECEIVED', forward);
+    client.on('ON_NOTIFICATION_RECEIVED', forward);
+    client.on('connect', () => console.log(`[fcm] listener connected (credential #${this.credential.id})`));
+
+    await client.connect();
   }
 
-  const PushReceiverClient = require('@liamcottle/push-receiver/src/client');
-  client = new PushReceiverClient(gcm.androidId, gcm.securityToken, []);
-  const onPush = (raw) => {
+  stop() {
+    this.stopped = true;
     try {
-      handleNotification(raw);
-    } catch (err) {
-      console.error('[fcm] notification handler error:', err?.message ?? err);
+      this.client?.destroy?.();
+    } catch {
+      /* already gone */
     }
-  };
-  // Unencrypted pushes arrive on ON_DATA_RECEIVED, encrypted ones on ON_NOTIFICATION_RECEIVED;
-  // classifyNotification tolerates both shapes, so we listen to both.
-  client.on('ON_DATA_RECEIVED', onPush);
-  client.on('ON_NOTIFICATION_RECEIVED', onPush);
-  client.connect().catch((err) => console.error('[fcm] connect failed:', err?.message ?? err));
-  console.log('[fcm] Smart Alarm listener started.');
-  return client;
+    this.client = null;
+  }
 }
 
-export function stopFcmListener() {
-  if (!client) return;
-  try {
-    client.destroy();
-  } catch {
-    /* best-effort; the process is exiting anyway */
-  }
-  client = null;
-}
+export default FcmListener;

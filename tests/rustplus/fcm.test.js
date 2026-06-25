@@ -3,7 +3,7 @@ import { db, resetDb } from '../helpers/testApp.js'; // first: sets DATABASE_PAT
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { extractData, classifyNotification, matchPairingServerId } from '../../rustplus/fcm.js';
-import { handleNotification } from '../../rustplus/fcmListener.js';
+import { handleAlarmNotification } from '../../rustplus/fcmManager.js';
 import * as Pairings from '../../backend/models/pairing.js';
 import { bus, ALARM_EVENT } from '../../shared/bus.js';
 
@@ -90,19 +90,19 @@ test('matchPairingServerId : exact ip+port, repli ip seul, sinon null', () => {
   assert.equal(matchPairingServerId({ ip: '1.2.3.4' }, []), null);
 });
 
-// ── handleNotification : résolution serveur + émission bus ───────────────────────
+// ── handleAlarmNotification : résolution serveur + émission bus ───────────────────────
 
 beforeEach(() => {
   resetDb();
   bus.removeAllListeners(ALARM_EVENT);
 });
 
-test('handleNotification : alarme → résout serveur via pairing + émet ALARM_EVENT', async () => {
+test('handleAlarmNotification : alarme → résout serveur via pairing + émet ALARM_EVENT', async () => {
   db.prepare("INSERT INTO servers (id, name, channel_id) VALUES (7, 'Atlas EU', 'chan-1')").run();
   Pairings.add({ serverId: 7, serverIp: '1.2.3.4', appPort: 28083, steamId: 's1', playerToken: 't1' });
 
   const emitted = new Promise((resolve) => bus.once(ALARM_EVENT, resolve));
-  const note = handleNotification(alarmAppData());
+  const note = handleAlarmNotification(alarmAppData());
   assert.equal(note.kind, 'alarm');
 
   const payload = await emitted;
@@ -112,16 +112,16 @@ test('handleNotification : alarme → résout serveur via pairing + émet ALARM_
   assert.equal(payload.message, 'Your base is under attack!');
 });
 
-test('handleNotification : non-alarme (team) → null, aucune émission', () => {
+test('handleAlarmNotification : non-alarme (team) → null, aucune émission', () => {
   let fired = false;
   bus.once(ALARM_EVENT, () => { fired = true; });
-  assert.equal(handleNotification(team), null);
+  assert.equal(handleAlarmNotification(team), null);
   assert.equal(fired, false);
 });
 
-test('handleNotification : alarme sans pairing → repli sur le nom, channelId null', async () => {
+test('handleAlarmNotification : alarme sans pairing → repli sur le nom, channelId null', async () => {
   const emitted = new Promise((resolve) => bus.once(ALARM_EVENT, resolve));
-  handleNotification(alarmNotif); // serveur "Atlas US" non tracké
+  handleAlarmNotification(alarmNotif); // serveur "Atlas US" non tracké
   const payload = await emitted;
   assert.equal(payload.serverName, 'Atlas US');
   assert.equal(payload.channelId, null);

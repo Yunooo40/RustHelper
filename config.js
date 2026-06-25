@@ -65,12 +65,12 @@ export const config = {
       afkThresholdMs: Number(env.RUSTPLUS_AFK_MS ?? 300_000), // 5 min immobile
       afkEpsilon: Number(env.RUSTPLUS_AFK_EPSILON ?? 1.5),    // metres; movement <= is "immobile"
     },
-    // FCM Smart Alarm listener (Phase 9). Forwards Rust+ Smart Alarm pushes to Discord.
-    // credentialsPath points at the JSON written by `npx @liamcottle/rustplus.js fcm-register`
-    // (account-level push creds, NOT per-server). Empty/missing = listener stays idle.
+    // FCM listener (Phase 7.2 auto-pairing + Phase 9 Smart Alarms). One push listener per
+    // registered credential (stored in the DB via `/fcm connect`) receives Rust+ "Pair with
+    // Server" pushes (auto-create the pairing) AND Smart Alarm pushes (forwarded to Discord).
+    // No-op until a credential is registered. Kill-switch: FCM_ENABLED=false.
     fcm: {
-      enabled: env.RUSTPLUS_FCM_ENABLED !== 'false',
-      credentialsPath: env.RUSTPLUS_FCM_CREDENTIALS ?? '',
+      enabled: env.FCM_ENABLED !== 'false',
     },
     // Diagnostics (Phase 10). When on, log raw Rust+ markers/monuments once per connect and
     // raw FCM pushes (secrets redacted) — to confirm the 'verify live' assumptions (marker
